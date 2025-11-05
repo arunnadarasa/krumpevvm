@@ -261,6 +261,19 @@ export function DeploymentWizard() {
               onChange={(e) => setActivatorAddress(e.target.value)}
               placeholder="0x..."
             />
+            <p className="text-sm text-muted-foreground mt-1">
+              Controls system activation and feature flags
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="activatorAddress">Activator Address *</Label>
+            <Input
+              id="activatorAddress"
+              value={activatorAddress}
+              onChange={(e) => setActivatorAddress(e.target.value)}
+              placeholder="0x..."
+            />
           </div>
 
           <div>

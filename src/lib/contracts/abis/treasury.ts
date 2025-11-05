@@ -1,0 +1,7 @@
+/**
+ * Treasury Contract ABI
+ * Constructor: (evvmAddress)
+ */
+export const TREASURY_ABI = [{"type":"constructor","inputs":[{"name":"_evvmAddress","type":"address","internalType":"address"}],"stateMutability":"nonpayable"}] as const;
+
+export const TREASURY_BYTECODE = '0x608034606f57601f61072638819003918201601f19168301916001600160401b03831184841017607357808492602094604052833981010312606f57516001600160a01b03811690819003606f575f80546001600160a01b03191691909117905560405161069e90816100888239f35b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe' as `0x${string}`;
