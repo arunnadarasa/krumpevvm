@@ -9,7 +9,7 @@ import { NonceGeneratorField } from '../shared/NonceGeneratorField';
 import { NonceTypeSelector } from '../shared/NonceTypeSelector';
 import { generateRandomNonce } from '@/lib/toolkit/nonceGenerator';
 import { buildSinglePaymentSignature, buildDispersePaymentSignature, validateAddress } from '@/lib/toolkit/signatureBuilder';
-import { useAccount } from 'wagmi';
+import { useAccount, useWalletClient } from 'wagmi';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Trash2 } from 'lucide-react';
@@ -21,6 +21,7 @@ interface PaymentSignatureFormsProps {
 
 export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignatureFormsProps) {
   const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
   
   const [singlePayment, setSinglePayment] = useState({
     to: '',
@@ -45,14 +46,20 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
 
   const handleSinglePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address) {
+    if (!address || !walletClient) {
       toast.error('Please connect your wallet');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const signatureData = buildSinglePaymentSignature(singlePayment);
+      const encodedData = buildSinglePaymentSignature(singlePayment);
+      
+      // Sign the message with the wallet
+      const signature = await walletClient.signMessage({
+        account: address,
+        message: { raw: encodedData as `0x${string}` }
+      });
       
       const { error } = await supabase.from('evvm_signatures').insert({
         user_id: address,
@@ -60,13 +67,14 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
         chain_id: chainId,
         signature_type: 'single_payment',
         signature_data: singlePayment,
-        signature_hash: signatureData,
+        signature_hash: signature,
+        nonce: singlePayment.nonce,
         status: 'created'
       });
 
       if (error) throw error;
 
-      toast.success('Payment signature created successfully!');
+      toast.success('Payment signature created and signed successfully!');
       setSinglePayment({ to: '', tokenAddress: '', amount: '', priorityFee: '0', executor: '', nonceType: 0, nonce: '' });
     } catch (error) {
       console.error('Error creating signature:', error);
@@ -78,7 +86,7 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
 
   const handleDispersePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address) {
+    if (!address || !walletClient) {
       toast.error('Please connect your wallet');
       return;
     }
@@ -88,10 +96,16 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
       const recipients = dispersePayment.recipients.map(r => r.address);
       const amounts = dispersePayment.recipients.map(r => r.amount);
       
-      const signatureData = buildDispersePaymentSignature({
+      const encodedData = buildDispersePaymentSignature({
         ...dispersePayment,
         recipients,
         amounts
+      });
+      
+      // Sign the message with the wallet
+      const signature = await walletClient.signMessage({
+        account: address,
+        message: { raw: encodedData as `0x${string}` }
       });
       
       const { error } = await supabase.from('evvm_signatures').insert({
@@ -100,13 +114,14 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
         chain_id: chainId,
         signature_type: 'disperse_payment',
         signature_data: { ...dispersePayment, recipients, amounts },
-        signature_hash: signatureData,
+        signature_hash: signature,
+        nonce: dispersePayment.nonce,
         status: 'created'
       });
 
       if (error) throw error;
 
-      toast.success('Disperse payment signature created successfully!');
+      toast.success('Disperse payment signature created and signed successfully!');
       setDispersePayment({ tokenAddress: '', priorityFee: '0', executor: '', nonceType: 0, nonce: '', recipients: [{ address: '', amount: '' }] });
     } catch (error) {
       console.error('Error creating signature:', error);

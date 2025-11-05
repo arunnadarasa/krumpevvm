@@ -33,7 +33,7 @@ export const storyMainnet = {
 
 export const config = getDefaultConfig({
   appName: 'EVVM Deployer',
-  projectId: 'c63ef80f2d8e00c8fa1ee792c2c43c2e', // Reown Project ID
+  projectId: 'a5ca7e54679de3a0f15c284bb26f428d', // Reown Project ID
   chains: [sepolia, arbitrumSepolia, storyTestnet, storyMainnet, mainnet],
   ssr: false,
   transports: {

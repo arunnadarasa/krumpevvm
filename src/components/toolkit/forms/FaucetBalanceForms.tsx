@@ -49,7 +49,14 @@ export function FaucetBalanceForms({ evvmAddress, chainId }: FaucetBalanceFormsP
 
     setIsSubmitting(true);
     try {
-      const signatureData = buildFaucetSignature(faucetForm);
+      // Build the encoded function data
+      const encodedData = buildFaucetSignature(faucetForm);
+      
+      // Sign the message with the wallet
+      const signature = await walletClient.signMessage({
+        account: address,
+        message: { raw: encodedData as `0x${string}` }
+      });
       
       // Store signature in database
       const { error } = await supabase.from('evvm_signatures').insert({
@@ -58,13 +65,14 @@ export function FaucetBalanceForms({ evvmAddress, chainId }: FaucetBalanceFormsP
         chain_id: chainId,
         signature_type: 'faucet',
         signature_data: faucetForm,
-        signature_hash: signatureData,
+        signature_hash: signature,
+        nonce: faucetForm.nonce,
         status: 'created'
       });
 
       if (error) throw error;
 
-      toast.success('Faucet signature created successfully!');
+      toast.success('Faucet signature created and signed successfully!');
       setFaucetForm({ to: '', tokenAddress: '', amount: '', nonce: '' });
     } catch (error) {
       console.error('Error creating signature:', error);
