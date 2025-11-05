@@ -314,6 +314,49 @@ export function DeploymentWizard() {
             </div>
           </Card>
 
+          {/* PHASE 5: Transaction Monitoring Dashboard */}
+          {progress && (
+            <div className="space-y-3 bg-primary/5 border border-primary/20 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="font-medium text-foreground">{progress.message}</span>
+              </div>
+              
+              {progress.txHash && (
+                <div className="text-sm space-y-1">
+                  <div className="text-muted-foreground">Transaction Hash:</div>
+                  <a
+                    href={`https://${network === 'Sepolia' ? 'sepolia.' : network === 'Arbitrum Sepolia' ? 'sepolia.' : ''}${network === 'Story Testnet' ? 'aeneid.explorer.story.foundation' : 'etherscan.io'}/tx/${progress.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-primary hover:underline break-all text-xs"
+                  >
+                    {progress.txHash}
+                  </a>
+                  <div className="text-muted-foreground text-xs mt-2 flex items-center gap-1">
+                    ⏳ Waiting for confirmation... This may take 30-60 seconds
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {deploymentResult && (
+            <div className="space-y-3 bg-accent/5 border border-accent/20 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-accent" />
+                <span className="font-semibold text-foreground">Deployment Successful!</span>
+              </div>
+              <div className="text-sm space-y-1">
+                <div><span className="text-muted-foreground">EVVM ID:</span> <span className="font-mono">{deploymentResult.evvmId}</span></div>
+                <div><span className="text-muted-foreground">EVVM Core:</span> <span className="font-mono text-xs">{deploymentResult.addresses.evvmCore}</span></div>
+              </div>
+              <Button onClick={resetForm} className="w-full mt-2">
+                Deploy Another EVVM
+              </Button>
+            </div>
+          )}
+
           <div className="flex gap-4">
             <Button
               variant="outline"

@@ -168,8 +168,134 @@ This approach:
 - ✅ Better error handling
 - ❌ Requires Foundry in edge function environment
 
+## Troubleshooting Deployment Issues
+
+### Common Errors and Solutions
+
+#### "Transaction dropped or replaced" / "Transaction 30 failed"
+
+**Cause**: Gas price too low, network congestion, or MetaMask transaction queue issues
+
+**Immediate Solutions**:
+1. **Reset MetaMask Account** (clears pending transactions):
+   - Settings → Advanced → Clear activity tab data
+   - Or: Settings → Advanced → Reset account (safer for testnets)
+
+2. **Increase Gas Settings** in MetaMask:
+   - Click "Market" → "Advanced"
+   - Set **Max base fee**: 40-50 Gwei
+   - Set **Priority fee**: 2-3 Gwei
+   - For Story Testnet: Use default settings
+
+3. **Get Fresh Testnet ETH**:
+   - You need ~0.15-0.2 ETH for full deployment
+   - [Sepolia Faucet](https://sepoliafaucet.com/)
+   - [Arbitrum Sepolia Faucet](https://faucet.quicknode.com/arbitrum/sepolia)
+   - Wait 5-10 minutes after resetting before deploying
+
+4. **Deploy During Low Traffic**:
+   - Best times: Early morning UTC (2-6 AM)
+   - Avoid: Weekday afternoons UTC (2-6 PM)
+
+#### "Insufficient funds" / "Gas estimation failed"
+
+**Cause**: Not enough ETH in wallet
+
+**Solution**:
+- Check balance: You need minimum 0.15 ETH
+- Get more from faucet (see links above)
+- Ensure you're on correct network in MetaMask
+
+#### "User rejected transaction"
+
+**Cause**: You declined a transaction in MetaMask
+
+**Solution**:
+- Start deployment again
+- You must approve all 7 transactions for complete deployment
+- Transaction sequence:
+  1. Deploy Staking (largest contract)
+  2. Deploy EVVM Core
+  3. Deploy NameService
+  4. Deploy Estimator
+  5. Deploy Treasury
+  6. Setup EVVM Core
+  7. Setup Staking
+
+#### "Pre-flight checks failed: Invalid address"
+
+**Cause**: One or more addresses are not valid Ethereum addresses
+
+**Solution**:
+- All addresses must start with `0x`
+- All addresses must be exactly 42 characters
+- Use checksummed addresses when possible
+- Common mistake: Missing `0x` prefix
+
+#### Deployment Hangs / Takes Too Long
+
+**Cause**: Network issues or low gas price
+
+**Solution**:
+1. Check block explorer to see if transactions are pending
+2. If pending for >5 minutes, increase gas and retry
+3. If transaction shows as failed, check error message on block explorer
+4. Reset MetaMask and start fresh if stuck
+
+### Optimal MetaMask Settings for Deployment
+
+**For Ethereum Sepolia / Arbitrum Sepolia**:
+- Gas Limit: Auto (let wallet estimate)
+- Max Base Fee: 40-50 Gwei
+- Priority Fee: 2-3 Gwei
+- Advanced: Enable "Customize transaction nonce" if deploying multiple times
+
+**For Story Testnet**:
+- Use default gas settings
+- Network handles gas pricing automatically
+
+### Pre-Deployment Checklist
+
+✅ Wallet has at least 0.15 ETH  
+✅ Connected to correct network  
+✅ All addresses are valid (42 chars, start with 0x)  
+✅ MetaMask has no pending transactions  
+✅ Browser console shows no errors  
+✅ Network is not congested (check block explorer)
+
+### Recovery from Failed Deployment
+
+If deployment fails mid-way:
+
+1. **Check what deployed**: Look at recent transactions in MetaMask
+2. **Note deployed addresses**: Save any successful contract deployments
+3. **Don't retry immediately**: Wait 5 minutes for blockchain to settle
+4. **Reset and start fresh**: Clear MetaMask activity and deploy again
+5. **Contact support**: If repeated failures, share transaction hashes
+
+### Getting Help
+
+If you continue to experience issues:
+
+1. **Collect Information**:
+   - Network name
+   - Failed transaction hashes
+   - Error messages from console (F12)
+   - Screenshots of MetaMask prompts
+
+2. **Check Block Explorer**:
+   - [Sepolia Etherscan](https://sepolia.etherscan.io/)
+   - [Arbitrum Sepolia](https://sepolia.arbiscan.io/)
+   - [Story Explorer](https://aeneid.explorer.story.foundation/)
+
+3. **Debug Mode**:
+   - Open browser console (F12)
+   - Look for red error messages
+   - Check Network tab for failed requests
+
 ## Documentation References
 
 - [EVVM QuickStart](https://docs.evvm.org/quickstart)
 - [Registry EVVM Contract](https://docs.evvm.org/registry)
 - [NPM Package](https://www.npmjs.com/package/@evvm/testnet-contracts)
+- [MetaMask Troubleshooting](https://support.metamask.io/hc/en-us/articles/360015489251)
