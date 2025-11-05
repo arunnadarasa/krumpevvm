@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAccount, usePublicClient, useWalletClient, useSwitchChain } from 'wagmi';
-import { Address, Hash } from 'viem';
+import { Address, Hash, keccak256, toHex, hexToNumber } from 'viem';
 import { deployEVVMContracts, DeploymentProgress } from '@/lib/contracts/evvmDeployment';
 import { REGISTRY_ABI, REGISTRY_ADDRESS } from '../../supabase/functions/deploy-evvm/registry-abi';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,6 +53,8 @@ export function useEVVMDeployment() {
   const { address: userAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+  const { data: sepoliaWalletClient } = useWalletClient({ chainId: 11155111 });
+  const sepoliaPublicClient = usePublicClient({ chainId: 11155111 });
   const { switchChainAsync } = useSwitchChain();
   const { toast } = useToast();
 
@@ -174,12 +176,8 @@ export function useEVVMDeployment() {
 
       await switchChainAsync({ chainId: 11155111 }); // Sepolia
 
-      // Wait for new clients to be ready
+      // Wait for clients to update after chain switch
       await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Get fresh clients bound to Sepolia
-      const { data: sepoliaWalletClient } = useWalletClient({ chainId: 11155111 });
-      const sepoliaPublicClient = usePublicClient({ chainId: 11155111 });
 
       if (!sepoliaWalletClient || !sepoliaPublicClient) {
         throw new Error('Failed to get Sepolia clients. Please ensure you are connected to Ethereum Sepolia.');
@@ -315,16 +313,25 @@ export function useEVVMDeployment() {
 }
 
 function extractEvvmIdFromReceipt(receipt: any): number {
-  // Extract EVVM ID from EVVMRegistered event
+  // Calculate keccak256 hash of the event signature
+  // EVVMRegistered(uint256 indexed evvmId, address evvmCore, uint256 chainId)
+  const eventSignature = keccak256(toHex('EVVMRegistered(uint256,address,uint256)'));
+  
+  // Find the EVVMRegistered event in the logs
   const event = receipt.logs.find((log: any) => 
-    log.topics[0] === '0x...' // EVVMRegistered event signature
+    log.topics[0] === eventSignature
   );
   
-  if (!event) {
-    throw new Error('EVVM ID not found in transaction receipt');
+  if (!event || !event.topics || event.topics.length < 2) {
+    console.error('EVVM ID extraction failed. Receipt logs:', receipt.logs);
+    throw new Error('EVVMRegistered event not found in transaction receipt. The registry transaction may have failed.');
   }
   
-  // Parse event data to get evvmId
-  // This is a placeholder - actual implementation depends on event structure
-  return 1000; // Placeholder
+  // The evvmId is the first indexed parameter, stored in topics[1]
+  // topics[0] = event signature hash
+  // topics[1] = evvmId (uint256, indexed)
+  const evvmId = hexToNumber(event.topics[1]);
+  
+  console.log('Extracted EVVM ID:', evvmId);
+  return evvmId;
 }
