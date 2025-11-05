@@ -2,8 +2,10 @@ import { DeploymentWizard } from '@/components/DeploymentWizard';
 import { Card } from '@/components/ui/card';
 import { useAccount } from 'wagmi';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
-import { Wallet } from 'lucide-react';
+import { Wallet, Network } from 'lucide-react';
+import { PublicEVVMBrowser } from '@/components/PublicEVVMBrowser';
 
 export default function Deploy() {
   const { isConnected } = useAccount();
@@ -31,12 +33,38 @@ export default function Deploy() {
     <div className="min-h-screen gradient-hero py-12">
       <div className="container mx-auto px-4">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gradient mb-4">Deploy Your EVVM</h1>
+          <h1 className="text-4xl font-bold text-gradient mb-4">EVVM Setup</h1>
           <p className="text-muted-foreground text-lg">
-            Follow the steps below to deploy your Ethereum Virtual Machine
+            Connect to an existing EVVM or deploy your own
           </p>
         </div>
-        <DeploymentWizard />
+
+        <Tabs defaultValue="connect" className="w-full">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+            <TabsTrigger value="connect">
+              <Network className="w-4 h-4 mr-2" />
+              Connect to Existing
+            </TabsTrigger>
+            <TabsTrigger value="deploy">
+              <Wallet className="w-4 h-4 mr-2" />
+              Deploy New
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="connect">
+            <PublicEVVMBrowser />
+          </TabsContent>
+
+          <TabsContent value="deploy">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold mb-2">Deploy Your Own EVVM</h2>
+              <p className="text-muted-foreground">
+                Follow the steps below to deploy your Ethereum Virtual Machine
+              </p>
+            </div>
+            <DeploymentWizard />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

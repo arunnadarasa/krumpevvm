@@ -4,9 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
 import { ExternalLink, Database, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PublicEVVMBrowser } from '@/components/PublicEVVMBrowser';
 
 interface Deployment {
   id: string;
@@ -108,15 +110,26 @@ export default function Registry() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gradient mb-4">EVVM Registry</h1>
           <p className="text-muted-foreground text-lg">
-            View and manage your deployed EVVMs
+            Connect to existing EVVMs or view your deployments
           </p>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : deployments.length === 0 ? (
+        <Tabs defaultValue="public" className="w-full">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+            <TabsTrigger value="public">Public EVVMs</TabsTrigger>
+            <TabsTrigger value="mydeployments">My Deployments</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="public">
+            <PublicEVVMBrowser />
+          </TabsContent>
+
+          <TabsContent value="mydeployments">
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : deployments.length === 0 ? (
           <Card className="glass-card p-12 text-center">
             <Database className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-bold mb-2">No Deployments Yet</h3>
@@ -236,7 +249,9 @@ export default function Registry() {
               </Card>
             ))}
           </div>
-        )}
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
