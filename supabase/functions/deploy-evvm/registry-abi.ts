@@ -4,14 +4,43 @@
 export const REGISTRY_ABI = [
   {
     type: 'function',
-    name: 'registerEVVM',
+    name: 'registerEvvm',
     inputs: [
-      { name: 'evvmCore', type: 'address' },
       { name: 'chainId', type: 'uint256' },
-      { name: 'metadata', type: 'bytes' },
+      { name: 'evvmAddress', type: 'address' },
     ],
     outputs: [{ name: 'evvmId', type: 'uint256' }],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'getEvvmIdMetadata',
+    inputs: [{ name: 'evvmId', type: 'uint256' }],
+    outputs: [
+      {
+        name: 'metadata',
+        type: 'tuple',
+        components: [
+          { name: 'chainId', type: 'uint256' },
+          { name: 'evvmAddress', type: 'address' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getPublicEvvmIdActive',
+    inputs: [],
+    outputs: [{ name: 'evvmIds', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'isChainIdRegistered',
+    inputs: [{ name: 'chainId', type: 'uint256' }],
+    outputs: [{ name: 'registered', type: 'bool' }],
+    stateMutability: 'view',
   },
   {
     type: 'event',
@@ -24,5 +53,5 @@ export const REGISTRY_ABI = [
   },
 ] as const;
 
-// Registry contract address on Ethereum Sepolia - PLACEHOLDER
-export const REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`;
+// Registry contract address on Ethereum Sepolia
+export const REGISTRY_ADDRESS = '0x389dC8fb09211bbDA841D59f4a51160dA2377832' as `0x${string}`;
