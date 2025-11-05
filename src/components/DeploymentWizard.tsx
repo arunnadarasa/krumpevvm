@@ -6,15 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useEVVMDeployment } from '@/hooks/useEVVMDeployment';
 
 type Step = 'setup' | 'configure' | 'deploy';
 
 export function DeploymentWizard() {
   const { address } = useAccount();
+  const { deploying, progress, deploymentResult, deployEVVM } = useEVVMDeployment();
   const [step, setStep] = useState<Step>('setup');
-  const [deploying, setDeploying] = useState(false);
 
   // Form state
   const [evvmName, setEvvmName] = useState('');
@@ -80,60 +80,19 @@ export function DeploymentWizard() {
       return;
     }
 
-    setDeploying(true);
-    try {
-      // Call edge function to deploy
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('deploy-evvm', {
-        body: {
-          evvmName,
-          tokenName,
-          tokenSymbol,
-          totalSupply: totalSupply || null,
-          adminAddress,
-          goldenFisherAddress,
-          activatorAddress,
-          nameServiceAddress: nameServiceAddress || null,
-          eraTokens: eraTokens || null,
-          rewardPerOperation: rewardPerOperation || null,
-          network,
-          deployerAddress: address,
-        },
-      });
-
-      if (functionError) throw functionError;
-
-      // Save to database
-      const { error: dbError } = await supabase.from('evvm_deployments').insert({
-        user_id: address!.toLowerCase(),
-        evvm_name: evvmName,
-        principal_token_name: tokenName,
-        principal_token_symbol: tokenSymbol,
-        total_supply: totalSupply ? Number(totalSupply) : null,
-        host_chain_name: network,
-        host_chain_id: getChainId(network),
-        admin_address: adminAddress,
-        golden_fisher_address: goldenFisherAddress,
-        activator_address: activatorAddress,
-        name_service_address: nameServiceAddress || null,
-        era_tokens: eraTokens ? Number(eraTokens) : null,
-        reward_per_operation: rewardPerOperation ? Number(rewardPerOperation) : null,
-        deployment_status: 'completed',
-        deployment_tx_hash: functionData?.txHash,
-        evvm_core_address: functionData?.contractAddress,
-      });
-
-      if (dbError) throw dbError;
-
-      toast.success('EVVM deployed successfully!');
-      
-      // Reset form
-      resetForm();
-    } catch (error: any) {
-      console.error('Deployment error:', error);
-      toast.error(error.message || 'Deployment failed');
-    } finally {
-      setDeploying(false);
-    }
+    await deployEVVM({
+      evvmName,
+      principalTokenName: tokenName,
+      principalTokenSymbol: tokenSymbol,
+      hostChainId: getChainId(network),
+      hostChainName: network,
+      adminAddress: adminAddress as `0x${string}`,
+      goldenFisherAddress: goldenFisherAddress as `0x${string}`,
+      activatorAddress: activatorAddress as `0x${string}`,
+      totalSupply: totalSupply || '0',
+      eraTokens: eraTokens || '0',
+      rewardPerOperation: rewardPerOperation || '0',
+    });
   };
 
   const resetForm = () => {
