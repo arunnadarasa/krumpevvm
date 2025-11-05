@@ -303,7 +303,7 @@ export async function deployEVVMContracts(
   const { walletClient, publicClient } = params;
   
   // STORY BLOCKCHAIN CONFIGURATION
-  const isStoryNetwork = params.chainId === 1513 || params.chainId === 1514; // Story Aeneid testnet or mainnet
+  const isStoryNetwork = params.chainId === 1315 || params.chainId === 1514; // Story Aeneid testnet or mainnet
   const confirmations = isStoryNetwork ? 5 : 3; // More confirmations for Story
   const verificationRetries = isStoryNetwork ? 7 : 5; // More retries for Story
   
