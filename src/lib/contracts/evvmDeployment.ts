@@ -54,6 +54,7 @@ export type DeploymentStage =
   | 'deployment-complete'    // Contracts deployed
   | 'switching-network'      // Switching to Sepolia
   | 'registering'            // Registry registration
+  | 'configuring-evvm'       // Setting EVVM ID on EVVM Core
   | 'complete';              // Everything done
 
 export interface DeploymentProgress {

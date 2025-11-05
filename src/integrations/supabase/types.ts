@@ -36,6 +36,7 @@ export type Database = {
           principal_token_symbol: string
           registry_tx_hash: string | null
           reward_per_operation: number | null
+          set_evvm_id_tx_hash: string | null
           staking_address: string | null
           total_supply: number | null
           treasury_address: string | null
@@ -63,6 +64,7 @@ export type Database = {
           principal_token_symbol: string
           registry_tx_hash?: string | null
           reward_per_operation?: number | null
+          set_evvm_id_tx_hash?: string | null
           staking_address?: string | null
           total_supply?: number | null
           treasury_address?: string | null
@@ -90,6 +92,7 @@ export type Database = {
           principal_token_symbol?: string
           registry_tx_hash?: string | null
           reward_per_operation?: number | null
+          set_evvm_id_tx_hash?: string | null
           staking_address?: string | null
           total_supply?: number | null
           treasury_address?: string | null

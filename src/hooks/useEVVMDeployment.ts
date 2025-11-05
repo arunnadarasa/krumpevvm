@@ -3,6 +3,7 @@ import { useAccount, usePublicClient, useWalletClient, useSwitchChain } from 'wa
 import { Address, Hash, keccak256, toHex, hexToNumber } from 'viem';
 import { deployEVVMContracts, DeploymentProgress } from '@/lib/contracts/evvmDeployment';
 import { REGISTRY_ABI, REGISTRY_ADDRESS } from '../../supabase/functions/deploy-evvm/registry-abi';
+import { EVVM_CORE_ABI } from '@/lib/contracts/abis/evvm-core';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { sepolia } from 'wagmi/chains';
@@ -217,6 +218,81 @@ export function useEVVMDeployment() {
 
       // Extract EVVM ID from events
       const evvmId = extractEvvmIdFromReceipt(registryReceipt);
+      
+      console.log('✅ Registry registration complete. EVVM ID:', evvmId);
+
+      // PHASE C: Switch back to original chain and set EVVM ID on EVVM Core
+      setProgress({
+        stage: 'configuring-evvm',
+        message: 'Switching back to deployment chain to configure EVVM ID...'
+      });
+
+      await switchChainAsync({ chainId: formData.hostChainId });
+
+      // Wait for chain switch to complete
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      if (!walletClient || !publicClient) {
+        throw new Error('Failed to reconnect to deployment chain after switching back');
+      }
+
+      // Verify we're back on the correct chain
+      const deploymentChain = await publicClient.getChainId();
+      if (deploymentChain !== formData.hostChainId) {
+        throw new Error(`Failed to switch back to chain ${formData.hostChainId}. Please switch manually and call setEvvmID(${evvmId}) on your EVVM Core contract at ${contracts.evvmCore}.`);
+      }
+
+      setProgress({
+        stage: 'configuring-evvm',
+        message: `Setting EVVM ID ${evvmId} on EVVM Core contract...`
+      });
+
+      // Call setEvvmID on EVVM Core contract
+      const setIdHash = await walletClient.writeContract({
+        address: contracts.evvmCore,
+        abi: EVVM_CORE_ABI,
+        functionName: 'setEvvmID',
+        args: [BigInt(evvmId)]
+      } as any);
+
+      setProgress({
+        stage: 'configuring-evvm',
+        message: 'Waiting for EVVM ID configuration...',
+        txHash: setIdHash
+      });
+
+      // Determine confirmations based on host chain (not Sepolia)
+      const isStoryChain = formData.hostChainId === 1315 || formData.hostChainId === 1514;
+      const setIdReceipt = await publicClient.waitForTransactionReceipt({
+        hash: setIdHash,
+        confirmations: isStoryChain ? 5 : 3,
+        timeout: 300_000
+      });
+
+      if (setIdReceipt.status !== 'success') {
+        throw new Error('Failed to set EVVM ID on EVVM Core contract');
+      }
+
+      // Verify the ID was set correctly
+      setProgress({
+        stage: 'configuring-evvm',
+        message: 'Verifying EVVM ID configuration...'
+      });
+
+      const verifiedEvvmId = await publicClient.readContract({
+        address: contracts.evvmCore,
+        abi: EVVM_CORE_ABI,
+        functionName: 'getEvvmID'
+      } as any) as bigint;
+
+      if (Number(verifiedEvvmId) !== evvmId) {
+        throw new Error(
+          `EVVM ID verification failed. Expected ${evvmId}, got ${verifiedEvvmId}. ` +
+          `The EVVM ID may not have been set correctly.`
+        );
+      }
+
+      console.log(`✅ EVVM ID ${evvmId} successfully configured and verified!`);
 
       setProgress({
         stage: 'complete',
@@ -246,8 +322,9 @@ export function useEVVMDeployment() {
           treasury_address: contracts.treasury,
           deployment_tx_hash: contracts.deploymentTxHash,
           registry_tx_hash: registryHash,
+          set_evvm_id_tx_hash: setIdHash,
           evvm_id: evvmId,
-          deployment_status: 'deployed'
+          deployment_status: 'completed'
         }]);
 
       if (dbError) throw dbError;
@@ -279,7 +356,14 @@ export function useEVVMDeployment() {
       let technicalDetails = '';
       
       if (error instanceof Error) {
-        if (error.message.includes('chain') || error.message.includes('Chain')) {
+        // Specific error handling for setEvvmID issues
+        if (error.message.includes('OnlyAdmin')) {
+          userMessage = 'Not authorized to set EVVM ID';
+          technicalDetails = `Only the admin address (${formData.adminAddress}) can set the EVVM ID. Please connect with the correct wallet.`;
+        } else if (error.message.includes('WindowToChangeEvvmIDExpired')) {
+          userMessage = 'EVVM ID window expired';
+          technicalDetails = 'The 1-hour window to set EVVM ID has expired. The EVVM ID is now permanent.';
+        } else if (error.message.includes('chain') || error.message.includes('Chain')) {
           userMessage = 'Network Mismatch';
           technicalDetails = 'Please make sure you are connected to Ethereum Sepolia (Chain ID: 11155111) before registering.';
         } else if (error.message.includes('User rejected') || error.message.includes('user rejected')) {

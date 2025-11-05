@@ -373,6 +373,12 @@ export function DeploymentWizard() {
                 <span className="font-medium text-foreground">{progress.message}</span>
               </div>
               
+              {progress.stage === 'configuring-evvm' && (
+                <div className="text-sm text-muted-foreground">
+                  🔧 Configuring EVVM ID on deployment chain. This makes your EVVM fully functional.
+                </div>
+              )}
+              
               {progress.txHash && (
                 <div className="text-sm space-y-1">
                   <div className="text-muted-foreground">Transaction Hash:</div>
@@ -514,29 +520,37 @@ export function DeploymentWizard() {
             )}
           </div>
 
-          {progress && progress.stage === 'registering' && progress.txHash && (
-            <div className="space-y-3 bg-primary/5 border border-primary/20 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="font-medium text-foreground">{progress.message}</span>
-              </div>
-              
-              <div className="text-sm space-y-1">
-                <div className="text-muted-foreground">Transaction Hash:</div>
-                <a
-                  href={`https://sepolia.etherscan.io/tx/${progress.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-primary hover:underline break-all text-xs"
-                >
-                  {progress.txHash}
-                </a>
-                <div className="text-muted-foreground text-xs mt-2 flex items-center gap-1">
-                  ⏳ Waiting for confirmation on Ethereum Sepolia...
+            {progress && (progress.stage === 'registering' || progress.stage === 'configuring-evvm') && (
+              <div className="space-y-3 bg-primary/5 border border-primary/20 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="font-medium text-foreground">{progress.message}</span>
                 </div>
+                
+                {progress.stage === 'configuring-evvm' && (
+                  <div className="text-sm text-muted-foreground">
+                    🔧 Setting EVVM ID on your EVVM Core contract to make it fully functional.
+                  </div>
+                )}
+                
+                {progress.txHash && (
+                  <div className="text-sm space-y-1">
+                    <div className="text-muted-foreground">Transaction Hash:</div>
+                    <a
+                      href={`https://${progress.stage === 'configuring-evvm' ? (network === 'Story Testnet' ? 'aeneid.explorer.story.foundation' : 'sepolia.etherscan.io') : 'sepolia.etherscan.io'}/tx/${progress.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-primary hover:underline break-all text-xs"
+                    >
+                      {progress.txHash}
+                    </a>
+                    <div className="text-muted-foreground text-xs mt-2 flex items-center gap-1">
+                      ⏳ Waiting for confirmation...
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
         </div>
       )}
 
