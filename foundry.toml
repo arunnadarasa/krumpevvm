@@ -1,0 +1,16 @@
+[profile.default]
+solc_version = "0.8.26"
+optimizer = true
+optimizer_runs = 20000
+evm_version = "cancun"
+via_ir = false
+verbosity = 3
+
+[profile.default.ffi]
+enabled = false
+
+[profile.default.rpc_endpoints]
+story_aeneid = "https://aeneid.storyrpc.io"
+
+[profile.default.etherscan]
+story_aeneid = { key = "AENEID", url = "https://aeneid.storyscan.io/api/" }
