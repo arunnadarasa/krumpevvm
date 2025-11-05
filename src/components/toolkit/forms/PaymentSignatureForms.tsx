@@ -55,12 +55,12 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
 
     setIsSubmitting(true);
     try {
-      const encodedData = buildSinglePaymentSignature(singlePayment);
+      const message = buildSinglePaymentSignature(singlePayment);
       
-      // Sign the message with the wallet
+      // Sign the EIP-191 message string
       const signature = await walletClient.signMessage({
         account: address,
-        message: { raw: encodedData as `0x${string}` }
+        message: message
       });
       
       const { error } = await supabase.from('evvm_signatures').insert({
@@ -98,16 +98,16 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
       const recipients = dispersePayment.recipients.map(r => r.address);
       const amounts = dispersePayment.recipients.map(r => r.amount);
       
-      const encodedData = buildDispersePaymentSignature({
+      const message = buildDispersePaymentSignature({
         ...dispersePayment,
         recipients,
         amounts
       });
       
-      // Sign the message with the wallet
+      // Sign the EIP-191 message string
       const signature = await walletClient.signMessage({
         account: address,
-        message: { raw: encodedData as `0x${string}` }
+        message: message
       });
       
       const { error } = await supabase.from('evvm_signatures').insert({

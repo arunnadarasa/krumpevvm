@@ -50,13 +50,13 @@ export function FaucetBalanceForms({ evvmAddress, chainId }: FaucetBalanceFormsP
 
     setIsSubmitting(true);
     try {
-      // Build the encoded function data
-      const encodedData = buildFaucetSignature(faucetForm);
+      // Build the EIP-191 message
+      const message = buildFaucetSignature(faucetForm);
       
-      // Sign the message with the wallet
+      // Sign the EIP-191 message string
       const signature = await walletClient.signMessage({
         account: address,
-        message: { raw: encodedData as `0x${string}` }
+        message: message
       });
       
       // Store signature in database
