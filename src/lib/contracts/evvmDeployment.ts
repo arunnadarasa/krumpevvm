@@ -710,7 +710,16 @@ async function deployContract(
   const bufferedGasPrice = (gasPrice * 120n) / 100n;
   
   // Estimate gas needed with buffer (50% for Story, 30% for others)
-  const gasLimit = await estimateDeploymentGas(publicClient, params, isStoryNetwork);
+  let gasLimit = await estimateDeploymentGas(publicClient, params, isStoryNetwork);
+  
+  // Enforce a minimum gas limit for Story large contracts
+  if (isStoryNetwork && gasLimit < 55_000_000n) {
+    console.warn('⚠️ Gas estimate below Story minimum, clamping to 55M', {
+      previous: gasLimit.toString(),
+      recommendedMin: '55,000,000'
+    });
+    gasLimit = 55_000_000n;
+  }
   
   // Log final gas configuration before deployment
   console.log('🚀 Final deployment configuration:', {
@@ -720,14 +729,6 @@ async function deployContract(
     estimatedCost: formatEther((gasLimit * bufferedGasPrice)),
     network: isStoryNetwork ? 'Story (large contracts!)' : 'Standard EVM'
   });
-  
-  // Story-specific warning if gas seems low
-  if (isStoryNetwork && gasLimit < 40_000_000n) {
-    console.warn('⚠️ WARNING: Gas limit seems low for Story deployment!', {
-      current: gasLimit.toString(),
-      recommended: '50M-60M for large contracts'
-    });
-  }
   
   const hash = await walletClient.deployContract({
     abi: params.abi,
