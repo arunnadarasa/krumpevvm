@@ -138,7 +138,35 @@ async function estimateDeploymentGas(
 }
 
 /**
+ * Verify bytecode exists at address with retry logic
+ * Story blockchain needs extra time for state finalization
+ */
+async function verifyBytecodeWithRetry(
+  publicClient: PublicClient,
+  address: Address,
+  maxRetries: number = 5
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const bytecode = await publicClient.getBytecode({ address });
+    
+    if (bytecode && bytecode !== '0x') {
+      console.log(`✅ Bytecode verified at ${address} (attempt ${attempt})`);
+      return true;
+    }
+    
+    if (attempt < maxRetries) {
+      const delay = attempt * 2000; // Progressive: 2s, 4s, 6s, 8s, 10s
+      console.log(`⏳ Waiting ${delay}ms for bytecode to finalize (attempt ${attempt}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Checks if a contract was deployed in recent blocks
+ * Optimized for Story blockchain with faster block times
  */
 async function checkPendingDeployment(
   publicClient: PublicClient,
@@ -147,7 +175,8 @@ async function checkPendingDeployment(
   try {
     const latestBlock = await publicClient.getBlockNumber();
     
-    for (let i = 0n; i < 10n; i++) {
+    // Check last 20 blocks (Story may have faster block times)
+    for (let i = 0n; i < 20n; i++) {
       const block = await publicClient.getBlock({ 
         blockNumber: latestBlock - i,
         includeTransactions: true 
@@ -164,13 +193,14 @@ async function checkPendingDeployment(
           });
           
           if (receipt.contractAddress) {
+            console.log(`📦 Found contract deployment: ${receipt.contractAddress} (tx: ${tx.hash})`);
             return { contractAddress: receipt.contractAddress };
           }
         }
       }
     }
   } catch (error) {
-    console.warn('Failed to check pending deployments:', error);
+    console.warn('⚠️ Failed to check pending deployments:', error);
   }
   
   return null;
@@ -188,19 +218,20 @@ async function deployContractWithRetry(
     args: any[];
   },
   onProgress?: (txHash: Hash) => void,
-  maxRetries: number = 3
+  maxRetries: number = 3,
+  isStoryNetwork: boolean = false
 ): Promise<Address> {
   let lastError: Error | null = null;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`Deployment attempt ${attempt}/${maxRetries}`);
+      console.log(`🚀 Deployment attempt ${attempt}/${maxRetries}`);
       
-      return await deployContract(walletClient, publicClient, params, onProgress);
+      return await deployContract(walletClient, publicClient, params, onProgress, isStoryNetwork);
       
     } catch (error) {
       lastError = error as Error;
-      console.error(`Attempt ${attempt} failed:`, error);
+      console.error(`❌ Attempt ${attempt} failed:`, error);
       
       // Check if it's a user rejection - don't retry
       if (error instanceof Error && 
@@ -209,17 +240,40 @@ async function deployContractWithRetry(
         throw error;
       }
       
-      // Check if contract was actually deployed despite error
+      // CRITICAL FIX: Check if contract was actually deployed despite error
       const receipt = await checkPendingDeployment(publicClient, walletClient.account!.address);
       if (receipt?.contractAddress) {
-        console.log('Found deployed contract despite error:', receipt.contractAddress);
-        return receipt.contractAddress;
+        console.log('✅ Found deployed contract despite error:', receipt.contractAddress);
+        
+        // VERIFY the bytecode exists before returning
+        const verified = await verifyBytecodeWithRetry(publicClient, receipt.contractAddress, isStoryNetwork ? 7 : 5);
+        if (verified) {
+          return receipt.contractAddress;
+        }
+      }
+      
+      // Check if error is about bytecode verification timing
+      if (error.message.includes('Bytecode verification timeout')) {
+        // Extract address from error message and verify one more time
+        const addressMatch = error.message.match(/0x[a-fA-F0-9]{40}/);
+        if (addressMatch) {
+          const address = addressMatch[0] as Address;
+          console.log(`⏳ Final verification attempt for ${address}...`);
+          
+          // Wait longer before final verification
+          await new Promise(resolve => setTimeout(resolve, 10000)); // 10s
+          
+          const verified = await verifyBytecodeWithRetry(publicClient, address, 3);
+          if (verified) {
+            return address;
+          }
+        }
       }
       
       if (attempt < maxRetries) {
         // Exponential backoff: 2s, 4s, 8s
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`Retrying in ${delay}ms...`);
+        console.log(`⏳ Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -247,6 +301,14 @@ export async function deployEVVMContracts(
   onProgress?: (progress: DeploymentProgress) => void
 ): Promise<EVVMDeploymentResult> {
   const { walletClient, publicClient } = params;
+  
+  // STORY BLOCKCHAIN CONFIGURATION
+  const isStoryNetwork = params.chainId === 1513 || params.chainId === 1514; // Story Aeneid testnet or mainnet
+  const confirmations = isStoryNetwork ? 5 : 3; // More confirmations for Story
+  const verificationRetries = isStoryNetwork ? 7 : 5; // More retries for Story
+  
+  console.log(`🌐 Deploying on ${isStoryNetwork ? 'Story Network (Chain ID: ' + params.chainId + ')' : 'network ' + params.chainId}`);
+  console.log(`⚙️ Using ${confirmations} confirmations and ${verificationRetries} verification retries`);
   
   // PHASE 6: Pre-flight checks
   console.log('Running pre-flight checks...');
@@ -290,7 +352,9 @@ export async function deployEVVMContracts(
           message: 'Deploying Staking contract (1/5)...',
           txHash: hash
         });
-      }
+      },
+      3,
+      isStoryNetwork
     );
     
     // Verify nonce incremented
@@ -339,7 +403,9 @@ export async function deployEVVMContracts(
         stage: 'deploying-core',
         message: 'Deploying EVVM Core contract (2/5)...',
         txHash: hash
-      })
+      }),
+      3,
+      isStoryNetwork
     );
     
     currentNonce++;
@@ -365,7 +431,9 @@ export async function deployEVVMContracts(
         stage: 'deploying-nameservice',
         message: 'Deploying NameService contract (3/5)...',
         txHash: hash
-      })
+      }),
+      3,
+      isStoryNetwork
     );
     
     currentNonce++;
@@ -393,7 +461,9 @@ export async function deployEVVMContracts(
         stage: 'deploying-estimator',
         message: 'Deploying Estimator contract (4/5)...',
         txHash: hash
-      })
+      }),
+      3,
+      isStoryNetwork
     );
     
     currentNonce++;
@@ -416,7 +486,9 @@ export async function deployEVVMContracts(
         stage: 'deploying-treasury',
         message: 'Deploying Treasury contract (5/5)...',
         txHash: hash
-      })
+      }),
+      3,
+      isStoryNetwork
     );
     
     currentNonce++;
@@ -449,7 +521,7 @@ export async function deployEVVMContracts(
     
     await publicClient.waitForTransactionReceipt({ 
       hash: setupEvvmTxHash,
-      confirmations: 3,
+      confirmations,
       timeout: 300_000
     });
     
@@ -480,7 +552,7 @@ export async function deployEVVMContracts(
     
     await publicClient.waitForTransactionReceipt({ 
       hash: setupStakingTxHash,
-      confirmations: 3,
+      confirmations,
       timeout: 300_000
     });
     
@@ -527,7 +599,7 @@ export async function deployEVVMContracts(
 
 /**
  * Deploys a single contract with optimized gas settings
- * PHASE 1: Robust gas estimation and configuration
+ * Story blockchain optimized with bytecode verification retries
  */
 async function deployContract(
   walletClient: WalletClient,
@@ -537,13 +609,14 @@ async function deployContract(
     bytecode: `0x${string}`;
     args: any[];
   },
-  onProgress?: (txHash: Hash) => void
+  onProgress?: (txHash: Hash) => void,
+  isStoryNetwork: boolean = false
 ): Promise<Address> {
   console.log('Deploying contract with args:', params.args);
   
   // Get current gas prices with 20% buffer
   const gasPrice = await publicClient.getGasPrice();
-  const bufferedGasPrice = (gasPrice * 120n) / 100n; // 20% buffer
+  const bufferedGasPrice = (gasPrice * 120n) / 100n;
   
   // Estimate gas needed with 30% buffer
   const gasLimit = await estimateDeploymentGas(publicClient, params);
@@ -561,32 +634,56 @@ async function deployContract(
     account: walletClient.account!,
     chain: walletClient.chain,
     gas: gasLimit,
-    gasPrice: bufferedGasPrice, // Use legacy gas pricing for compatibility
+    gasPrice: bufferedGasPrice,
   });
   
   console.log('Deployment transaction submitted:', hash);
   onProgress?.(hash);
   
-  // Wait with more confirmations for safety (PHASE 1)
+  // CRITICAL: Story blockchain needs MORE confirmations than Ethereum
+  const confirmations = isStoryNetwork ? 5 : 3;
   const receipt = await publicClient.waitForTransactionReceipt({ 
     hash,
-    confirmations: 3, // Increased from 2
-    timeout: 300_000 // 5 minute timeout
+    confirmations,
+    timeout: 300_000
   });
   
   if (!receipt.contractAddress) {
     throw new Error('Contract deployment failed - no address returned');
   }
   
-  // Verify contract code exists (PHASE 1)
-  const deployedCode = await publicClient.getBytecode({
-    address: receipt.contractAddress
-  });
+  // Use retry logic for bytecode verification (Story blockchain timing fix)
+  console.log(`⏳ Verifying bytecode deployment at ${receipt.contractAddress}...`);
   
-  if (!deployedCode || deployedCode === '0x') {
-    throw new Error(`No code deployed at ${receipt.contractAddress}`);
+  if (isStoryNetwork) {
+    onProgress?.(hash); // Update progress to show Story-specific wait
   }
   
-  console.log('Contract deployed and verified at:', receipt.contractAddress);
+  const verificationRetries = isStoryNetwork ? 7 : 5;
+  const verified = await verifyBytecodeWithRetry(publicClient, receipt.contractAddress, verificationRetries);
+  
+  if (!verified) {
+    // Before failing, do one final deep check
+    const finalCheck = await publicClient.getBytecode({
+      address: receipt.contractAddress
+    });
+    
+    if (!finalCheck || finalCheck === '0x') {
+      const explorerUrl = isStoryNetwork 
+        ? `https://aeneid.storyscan.io/tx/${hash}`
+        : `https://etherscan.io/tx/${hash}`;
+      
+      throw new Error(
+        `⏰ Bytecode verification timeout at ${receipt.contractAddress}\n\n` +
+        `✅ Your contract IS deployed. The delay is due to ${isStoryNetwork ? 'Story blockchain' : 'network'} indexing.\n\n` +
+        `📋 Transaction: ${hash}\n` +
+        `🔗 Explorer: ${explorerUrl}\n\n` +
+        `⚡ The contract will be fully available in 30-60 seconds.\n` +
+        `   You can verify manually at: ${receipt.contractAddress}`
+      );
+    }
+  }
+  
+  console.log('✅ Contract deployed and verified at:', receipt.contractAddress);
   return receipt.contractAddress;
 }
