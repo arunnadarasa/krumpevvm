@@ -310,6 +310,30 @@ export async function deployEVVMContracts(
   console.log(`🌐 Deploying on ${isStoryNetwork ? 'Story Network (Chain ID: ' + params.chainId + ')' : 'network ' + params.chainId}`);
   console.log(`⚙️ Using ${confirmations} confirmations and ${verificationRetries} verification retries`);
   
+  // BYTECODE VALIDATION - Verify all bytecodes start with 0x6080 (valid PUSH1 opcode)
+  const bytecodes = [
+    { name: 'Staking', code: STAKING_BYTECODE },
+    { name: 'EVVM Core', code: EVVM_CORE_BYTECODE },
+    { name: 'NameService', code: NAME_SERVICE_BYTECODE },
+    { name: 'Estimator', code: ESTIMATOR_BYTECODE },
+    { name: 'Treasury', code: TREASURY_BYTECODE }
+  ];
+  
+  for (const { name, code } of bytecodes) {
+    if (!code.startsWith('0x6080')) {
+      throw new Error(
+        `❌ ${name} bytecode validation failed!\n` +
+        `Expected: 0x6080... (valid EVM bytecode)\n` +
+        `Got: ${code.slice(0, 10)}...\n` +
+        `This indicates bytecode corruption. Please recompile contracts with Story-compatible settings.`
+      );
+    }
+    if (code.length < 1000) {
+      throw new Error(`❌ ${name} bytecode too short (${code.length} chars) - likely corrupted`);
+    }
+    console.log(`✅ ${name} bytecode validated: ${code.length} chars, starts with 0x6080`);
+  }
+  
   // PHASE 6: Pre-flight checks
   console.log('Running pre-flight checks...');
   const preFlightResult = await performPreFlightChecks(walletClient, publicClient, params);

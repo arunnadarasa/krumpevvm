@@ -2,8 +2,9 @@
  * Treasury Contract ABI
  * Constructor: (_evvmAddress)
  * 
- * COMPLETE BYTECODE - Includes constructor + runtime code
- * Extracted from full compilation artifacts (29,044 chars)
+ * ✅ STORY-OPTIMIZED BYTECODE (Treasury-3.json)
+ * Solidity: 0.8.20 | EVM: shanghai | Optimizer: 200 runs | via_ir: true  
+ * Bytecode: 29,028 chars | Verified: Starts with 0x6080
  */
 export const TREASURY_ABI = [{"type":"constructor","inputs":[{"name":"_evvmAddress","type":"address","internalType":"address"}],"stateMutability":"nonpayable"},{"type":"function","name":"deposit","inputs":[{"name":"token","type":"address","internalType":"address"},{"name":"amount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"payable"},{"type":"function","name":"evvmAddress","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"withdraw","inputs":[{"name":"token","type":"address","internalType":"address"},{"name":"amount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"error","name":"DepositAmountMustBeGreaterThanZero","inputs":[]},{"type":"error","name":"InsufficientBalance","inputs":[]},{"type":"error","name":"InvalidDepositAmount","inputs":[]},{"type":"error","name":"PrincipalTokenIsNotWithdrawable","inputs":[]}] as const;
 
