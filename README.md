@@ -1,73 +1,100 @@
-# Welcome to your Lovable project
+# EVVM Deployer & Registry
 
-## Project info
+A production-ready Web3 application for deploying and managing Ethereum Virtual Machines (EVVMs) with integrated MetaMask support.
 
-**URL**: https://lovable.dev/projects/46e04628-cab2-44b0-aa35-5954e550bbc6
+## 🚀 Features
 
-## How can I edit this code?
+- **Multi-Chain Support**: Deploy on Ethereum Sepolia, Arbitrum Sepolia, and Story Protocol
+- **MetaMask Integration**: Full wallet connection via RainbowKit
+- **Deployment Wizard**: Step-by-step EVVM deployment process
+- **Registry Management**: View and track all your EVVM deployments
+- **Real Blockchain Transactions**: Production-ready contract interactions
+- **Lovable Cloud Backend**: Automatic database and edge functions
 
-There are several ways of editing your application.
+## 🛠️ Technology Stack
 
-**Use Lovable**
+### Frontend
+- React 18.3.1 with TypeScript
+- Vite for blazing-fast builds
+- Tailwind CSS with custom design system
+- shadcn/ui component library
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/46e04628-cab2-44b0-aa35-5954e550bbc6) and start prompting.
+### Web3 Integration
+- Wagmi 2.19.2 - React hooks for Ethereum
+- Viem 2.38.6 - TypeScript Ethereum library
+- RainbowKit 2.2.9 - Beautiful wallet connection UI
 
-Changes made via Lovable will be committed automatically to this repo.
+### Backend (Lovable Cloud)
+- Supabase PostgreSQL database with Row Level Security
+- Edge Functions for blockchain interactions
+- Automated deployment tracking
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## 📦 Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Navigate to project
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 🌐 Supported Networks
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- **Ethereum Sepolia** (Chain ID: 11155111)
+- **Arbitrum Sepolia** (Chain ID: 421614)
+- **Story Testnet** (Chain ID: 1315)
+- **Story Mainnet** (Chain ID: 1514)
 
-**Use GitHub Codespaces**
+## 🎨 Design System
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The app features a futuristic blockchain theme with:
+- Deep blues and purples for the background
+- Vibrant primary colors (purple #A855F7)
+- Cyan accents for highlights
+- Glassmorphic cards with backdrop blur
+- Smooth animations and transitions
 
-## What technologies are used for this project?
+## 🔐 Security
 
-This project is built with:
+- Row Level Security (RLS) on all database tables
+- Wallet-based authentication
+- Input validation on all forms
+- Secure edge function endpoints
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📝 Usage
 
-## How can I deploy this project?
+1. **Connect Wallet**: Click "Connect Wallet" to link your MetaMask
+2. **Deploy EVVM**: Navigate to Deploy and follow the wizard
+3. **View Registry**: Check your deployments in the Registry
 
-Simply open [Lovable](https://lovable.dev/projects/46e04628-cab2-44b0-aa35-5954e550bbc6) and click on Share -> Publish.
+## 🚀 Deployment
 
-## Can I connect a custom domain to my Lovable project?
+Deploy via Lovable:
+1. Open [Lovable](https://lovable.dev/projects/46e04628-cab2-44b0-aa35-5954e550bbc6)
+2. Click Share → Publish
 
-Yes, you can!
+## 📚 Documentation
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- [Lovable Docs](https://docs.lovable.dev/)
+- [Wagmi Docs](https://wagmi.sh/)
+- [RainbowKit Docs](https://www.rainbowkit.com/)
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🤝 Contributing
+
+This is a Lovable project. To contribute:
+1. Make changes via Lovable or your IDE
+2. Commit and push changes
+3. Changes sync automatically
+
+## 📄 License
+
+EVVM Noncommercial License v1.0
+
+For commercial licensing, contact g@evvm.org
