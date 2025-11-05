@@ -16,7 +16,12 @@ interface Deployment {
   host_chain_name: string;
   deployment_status: string;
   deployment_tx_hash: string | null;
+  registry_tx_hash: string | null;
   evvm_core_address: string | null;
+  name_service_address: string | null;
+  staking_address: string | null;
+  estimator_address: string | null;
+  treasury_address: string | null;
   evvm_id: number | null;
   created_at: string;
 }
@@ -59,9 +64,13 @@ export default function Registry() {
     const explorers: Record<string, string> = {
       'Sepolia': `https://sepolia.etherscan.io/tx/${txHash}`,
       'Arbitrum Sepolia': `https://sepolia.arbiscan.io/tx/${txHash}`,
-      'Story Testnet': `https://aeneid.explorer.story.foundation/tx/${txHash}`,
+      'Story Testnet': `https://aeneid.storyscan.io/tx/${txHash}`,
     };
     return explorers[chainName] || '#';
+  };
+
+  const getRegistryExplorerUrl = (txHash: string) => {
+    return `https://sepolia.etherscan.io/tx/${txHash}`;
   };
 
   const getStatusColor = (status: string) => {
@@ -124,19 +133,19 @@ export default function Registry() {
               <Card key={deployment.id} className="glass-card p-6 hover:shadow-glow transition-all">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
                       <h3 className="text-xl font-bold">{deployment.evvm_name}</h3>
                       <Badge className={getStatusColor(deployment.deployment_status)}>
                         {deployment.deployment_status}
                       </Badge>
-                      {deployment.evvm_id && (
-                        <Badge variant="outline" className="border-accent text-accent">
-                          ID: {deployment.evvm_id}
+                      {deployment.evvm_id !== null && (
+                        <Badge variant="outline" className="border-primary/50 text-primary bg-primary/10 font-bold">
+                          EVVM ID: {deployment.evvm_id}
                         </Badge>
                       )}
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
                       <div>
                         <span className="text-muted-foreground">Token:</span>{' '}
                         <span className="font-medium">
@@ -147,18 +156,61 @@ export default function Registry() {
                         <span className="text-muted-foreground">Network:</span>{' '}
                         <span className="font-medium">{deployment.host_chain_name}</span>
                       </div>
-                      {deployment.evvm_core_address && (
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground">Contract:</span>{' '}
-                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                            {deployment.evvm_core_address}
-                          </code>
-                        </div>
-                      )}
                     </div>
+
+                    {/* Contract Addresses */}
+                    {(deployment.evvm_core_address || deployment.name_service_address || 
+                      deployment.staking_address || deployment.estimator_address || 
+                      deployment.treasury_address) && (
+                      <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Contract Addresses</h4>
+                        <div className="grid gap-2 text-xs">
+                          {deployment.evvm_core_address && (
+                            <div>
+                              <span className="text-muted-foreground">EVVM Core:</span>{' '}
+                              <code className="bg-muted px-2 py-1 rounded font-mono text-xs">
+                                {deployment.evvm_core_address}
+                              </code>
+                            </div>
+                          )}
+                          {deployment.name_service_address && (
+                            <div>
+                              <span className="text-muted-foreground">Name Service:</span>{' '}
+                              <code className="bg-muted px-2 py-1 rounded font-mono text-xs">
+                                {deployment.name_service_address}
+                              </code>
+                            </div>
+                          )}
+                          {deployment.staking_address && (
+                            <div>
+                              <span className="text-muted-foreground">Staking:</span>{' '}
+                              <code className="bg-muted px-2 py-1 rounded font-mono text-xs">
+                                {deployment.staking_address}
+                              </code>
+                            </div>
+                          )}
+                          {deployment.estimator_address && (
+                            <div>
+                              <span className="text-muted-foreground">Estimator:</span>{' '}
+                              <code className="bg-muted px-2 py-1 rounded font-mono text-xs">
+                                {deployment.estimator_address}
+                              </code>
+                            </div>
+                          )}
+                          {deployment.treasury_address && (
+                            <div>
+                              <span className="text-muted-foreground">Treasury:</span>{' '}
+                              <code className="bg-muted px-2 py-1 rounded font-mono text-xs">
+                                {deployment.treasury_address}
+                              </code>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     {deployment.deployment_tx_hash && (
                       <Button
                         variant="outline"
@@ -166,7 +218,17 @@ export default function Registry() {
                         onClick={() => window.open(getExplorerUrl(deployment.host_chain_name, deployment.deployment_tx_hash!), '_blank')}
                       >
                         <ExternalLink className="w-4 h-4 mr-2" />
-                        View TX
+                        View Deployment Tx
+                      </Button>
+                    )}
+                    {deployment.registry_tx_hash && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(getRegistryExplorerUrl(deployment.registry_tx_hash!), '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        View Registry Tx
                       </Button>
                     )}
                   </div>
