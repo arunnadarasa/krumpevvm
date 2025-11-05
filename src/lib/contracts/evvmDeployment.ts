@@ -720,11 +720,22 @@ async function deployContract(
     });
     gasLimit = 55_000_000n;
   }
-  
+
+  // Network block gas limit guard (prevents impossible deployments on L1 testnets like Sepolia)
+  const latestBlock = await publicClient.getBlock({ blockTag: 'latest' });
+  const blockGasLimit = (latestBlock as any).gasLimit as bigint | undefined;
+  if (!isStoryNetwork && blockGasLimit && gasLimit >= (blockGasLimit - 500_000n)) {
+    throw new Error(
+      `Contract too large for this network. Max per-tx gas ≈ ${blockGasLimit.toString()} but required ≈ ${gasLimit.toString()}. ` +
+      `Please deploy on Story Aeneid/Mainnet or another chain with higher block gas limits.`
+    );
+  }
+
   // Log final gas configuration before deployment
   console.log('🚀 Final deployment configuration:', {
     gasLimit: gasLimit.toString(),
     gasLimitInMillion: `${(Number(gasLimit) / 1_000_000).toFixed(1)}M`,
+    blockGasLimit: blockGasLimit ? blockGasLimit.toString() : 'unknown',
     gasPrice: bufferedGasPrice.toString(),
     estimatedCost: formatEther((gasLimit * bufferedGasPrice)),
     network: isStoryNetwork ? 'Story (large contracts!)' : 'Standard EVM'
