@@ -12,6 +12,15 @@ import {
   TREASURY_BYTECODE
 } from './abis';
 
+// Helper function to get native currency symbol for a chain
+function getNativeSymbol(chainId: number): string {
+  if (chainId === 1315 || chainId === 1514) return 'IP'; // Story networks
+  if (chainId === 84532) return 'ETH'; // Base Sepolia
+  if (chainId === 421614) return 'ETH'; // Arbitrum Sepolia
+  if (chainId === 11155111) return 'ETH'; // Sepolia
+  return 'ETH'; // Default
+}
+
 export interface EVVMDeploymentParams {
   // Administrator addresses
   adminAddress: Address;
@@ -72,6 +81,8 @@ async function performPreFlightChecks(
   params: EVVMDeploymentParams
 ): Promise<{ success: boolean; issues: string[] }> {
   const issues: string[] = [];
+  const currencyName = getNativeSymbol(params.chainId);
+  const isStoryNetwork = params.chainId === 1315 || params.chainId === 1514;
   
   // Check 1: Sufficient balance
   try {
@@ -79,9 +90,20 @@ async function performPreFlightChecks(
       address: walletClient.account!.address
     });
     
-    const requiredBalance = parseEther('0.15'); // ~0.15 ETH for deployment
-    if (balance < requiredBalance) {
-      issues.push(`Insufficient balance. You have ${formatEther(balance)} ETH but need ~0.15 ETH`);
+    // Estimate total deployment cost based on network
+    const estimatedGasTotal = isStoryNetwork 
+      ? 200_000_000n // ~200M gas for all 5 contracts on Story
+      : 100_000_000n; // ~100M gas on standard EVM
+    
+    const gasPrice = await publicClient.getGasPrice();
+    const estimatedCost = estimatedGasTotal * gasPrice;
+    
+    if (balance < estimatedCost) {
+      const required = formatEther(estimatedCost);
+      const current = formatEther(balance);
+      issues.push(
+        `Insufficient balance. Required: ~${required} ${currencyName}, Current: ${current} ${currencyName}`
+      );
     }
   } catch (error) {
     issues.push('Failed to check wallet balance');
@@ -116,7 +138,8 @@ async function performPreFlightChecks(
  */
 async function estimateDeploymentGas(
   publicClient: PublicClient,
-  params: { abi: any; bytecode: `0x${string}`; args: any[] }
+  params: { abi: any; bytecode: `0x${string}`; args: any[] },
+  isStoryNetwork: boolean = false
 ): Promise<bigint> {
   try {
     const deployData = encodeFunctionData({
@@ -129,12 +152,26 @@ async function estimateDeploymentGas(
       data: `${params.bytecode}${deployData.slice(2)}` as `0x${string}`
     });
     
-    // Add 30% buffer for safety
-    return (estimate * 130n) / 100n;
+    // Story needs higher buffer for large contracts
+    const bufferMultiplier = isStoryNetwork ? 150n : 130n; // 50% vs 30%
+    return (estimate * bufferMultiplier) / 100n;
   } catch (error) {
-    console.warn('Gas estimation failed, using fallback', error);
-    // Fallback for large contracts
-    return 12_000_000n; // 12M gas
+    console.warn('Gas estimation failed, using bytecode-based fallback:', error);
+    
+    // Calculate fallback based on bytecode size
+    const bytecodeLength = params.bytecode.length / 2; // Convert hex chars to bytes
+    
+    if (isStoryNetwork) {
+      // Story: 300 gas per byte + 10M for execution overhead
+      const gasPerByte = 300n;
+      const executionOverhead = 10_000_000n;
+      return (BigInt(bytecodeLength) * gasPerByte) + executionOverhead;
+    } else {
+      // Standard EVM: 200 gas per byte + 5M for execution overhead
+      const gasPerByte = 200n;
+      const executionOverhead = 5_000_000n;
+      return (BigInt(bytecodeLength) * gasPerByte) + executionOverhead;
+    }
   }
 }
 
@@ -603,16 +640,17 @@ export async function deployEVVMContracts(
     let errorMessage = 'Deployment failed';
     
     if (error instanceof Error) {
+      const currencyName = getNativeSymbol(params.chainId);
       if (error.message.includes('User rejected') || error.message.includes('user rejected')) {
         errorMessage = 'Transaction was rejected in MetaMask. Please approve all transactions to complete deployment.';
       } else if (error.message.includes('gas') || error.message.includes('Gas')) {
-        errorMessage = 'Transaction ran out of gas. Try increasing gas limit in MetaMask or check if you have enough ETH.';
+        errorMessage = `Transaction ran out of gas. Try increasing gas limit in MetaMask or check if you have enough ${currencyName}.`;
       } else if (error.message.includes('network') || error.message.includes('Network')) {
         errorMessage = 'Network connection issue. Please check your internet connection and try again.';
       } else if (error.message.includes('dropped') || error.message.includes('replaced')) {
         errorMessage = 'Transaction was dropped or replaced. This usually means gas price was too low. Please try again with higher gas.';
       } else if (error.message.includes('insufficient funds')) {
-        errorMessage = 'Insufficient funds. You need at least ~0.15 ETH for deployment.';
+        errorMessage = `Insufficient funds. You need at least ~0.15 ${currencyName} for deployment.`;
       } else {
         errorMessage = error.message;
       }
@@ -643,8 +681,8 @@ async function deployContract(
   const gasPrice = await publicClient.getGasPrice();
   const bufferedGasPrice = (gasPrice * 120n) / 100n;
   
-  // Estimate gas needed with 30% buffer
-  const gasLimit = await estimateDeploymentGas(publicClient, params);
+  // Estimate gas needed with buffer (50% for Story, 30% for others)
+  const gasLimit = await estimateDeploymentGas(publicClient, params, isStoryNetwork);
   
   console.log('Gas configuration:', {
     gasLimit: gasLimit.toString(),

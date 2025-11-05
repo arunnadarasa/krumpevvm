@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle2, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useEVVMDeployment } from '@/hooks/useEVVMDeployment';
 
 type Step = 'setup' | 'configure' | 'deploy' | 'registry' | 'complete';
@@ -364,6 +365,21 @@ export function DeploymentWizard() {
               <div><span className="text-muted-foreground">Admin:</span> {adminAddress.slice(0, 10)}...</div>
             </div>
           </Card>
+
+          {network === 'Story Testnet' && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Story Network Deployment</AlertTitle>
+              <AlertDescription>
+                EVVM contracts are very large (~110KB). You'll need:
+                <ul className="list-disc ml-4 mt-2 space-y-1">
+                  <li>At least <strong>0.3 IP</strong> for gas fees</li>
+                  <li>To <strong>manually increase gas limit</strong> in MetaMask (suggested: 50M per contract)</li>
+                  <li>~5-10 minutes for all 5 contracts to deploy</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* PHASE 5: Transaction Monitoring Dashboard */}
           {progress && (
