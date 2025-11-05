@@ -1,24 +1,35 @@
-import { encodeFunctionData, isAddress } from 'viem';
-import { FAUCET_ABI, PAYMENT_ABI, STAKING_ABI, NAME_SERVICE_ABI } from './evvmABI';
+import { isAddress } from 'viem';
+import { 
+  buildMessageSignedForPay,
+  buildMessageSignedForDispersePay,
+  buildMessageSignedForPublicStaking,
+  buildMessageSignedForPresaleStaking,
+  buildMessageSignedForPublicServiceStake,
+  buildMessageSignedForRegistrationUsername,
+  buildMessageSignedForPreRegistrationUsername,
+  hashPreRegisteredUsername,
+  hashDispersePaymentUsersToPay,
+  type DispersePayMetadata
+} from '@evvm/viem-signature-library';
 
 export const validateAddress = (address: string): boolean => {
   return isAddress(address);
 };
 
+// Faucet uses basic message format: "evvmID,faucet,to,tokenAddress,amount,nonce"
 export const buildFaucetSignature = (params: {
+  evvmID: string;
   to: string;
   tokenAddress: string;
   amount: string;
   nonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: FAUCET_ABI,
-    functionName: 'faucet',
-    args: [params.to as `0x${string}`, params.tokenAddress as `0x${string}`, BigInt(params.amount), params.nonce as `0x${string}`]
-  });
+  // Construct EIP-191 message format
+  return `${params.evvmID},faucet,${params.to.toLowerCase()},${params.tokenAddress.toLowerCase()},${params.amount},${params.nonce}`;
 };
 
 export const buildSinglePaymentSignature = (params: {
+  evvmID: string;
   to: string;
   tokenAddress: string;
   amount: string;
@@ -27,22 +38,21 @@ export const buildSinglePaymentSignature = (params: {
   nonceType: number;
   nonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: PAYMENT_ABI,
-    functionName: 'singlePayment',
-    args: [
-      params.to as `0x${string}`,
-      params.tokenAddress as `0x${string}`,
-      BigInt(params.amount),
-      BigInt(params.priorityFee),
-      params.executor as `0x${string}`,
-      params.nonceType,
-      params.nonce as `0x${string}`
-    ]
-  });
+  // Use official library for standardized EIP-191 message construction
+  return buildMessageSignedForPay(
+    BigInt(params.evvmID),
+    params.to as `0x${string}` | string,
+    params.tokenAddress as `0x${string}`,
+    BigInt(params.amount),
+    BigInt(params.priorityFee),
+    BigInt(params.nonce),
+    params.nonceType === 1, // true for async, false for sync
+    params.executor as `0x${string}`
+  );
 };
 
 export const buildDispersePaymentSignature = (params: {
+  evvmID: string;
   tokenAddress: string;
   recipients: string[];
   amounts: string[];
@@ -51,49 +61,63 @@ export const buildDispersePaymentSignature = (params: {
   nonceType: number;
   nonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: PAYMENT_ABI,
-    functionName: 'dispersePayment',
-    args: [
-      params.tokenAddress as `0x${string}`,
-      params.recipients as `0x${string}`[],
-      params.amounts.map(a => BigInt(a)),
-      BigInt(params.priorityFee),
-      params.executor as `0x${string}`,
-      params.nonceType,
-      params.nonce as `0x${string}`
-    ]
-  });
+  // Construct metadata for hashing
+  const toData: DispersePayMetadata[] = params.recipients.map((recipient, index) => ({
+    amount: BigInt(params.amounts[index]),
+    to_address: recipient as `0x${string}`,
+    to_identity: ""
+  }));
+
+  // Hash recipient data using official utility
+  const hashedData = hashDispersePaymentUsersToPay(toData);
+  
+  // Calculate total amount
+  const totalAmount = params.amounts.reduce((sum, amount) => sum + BigInt(amount), 0n);
+
+  // Use official library for standardized EIP-191 message construction
+  return buildMessageSignedForDispersePay(
+    BigInt(params.evvmID),
+    hashedData.slice(2), // Remove 0x prefix
+    params.tokenAddress as `0x${string}`,
+    totalAmount,
+    BigInt(params.priorityFee),
+    BigInt(params.nonce),
+    params.nonceType === 1, // true for async, false for sync
+    params.executor as `0x${string}`
+  );
 };
 
 export const buildGoldenStakingSignature = (params: {
+  evvmID: string;
   action: number;
   amount: string;
   nonceType: number;
   nonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: STAKING_ABI,
-    functionName: 'goldenStake',
-    args: [params.action, BigInt(params.amount), params.nonceType, params.nonce as `0x${string}`]
-  });
+  // Golden staking uses basic message format: "evvmID,goldenStaking,isStaking,amount,nonce"
+  const isStaking = params.action === 1;
+  return `${params.evvmID},goldenStaking,${isStaking},${params.amount},${params.nonce}`;
 };
 
 export const buildPresaleStakingSignature = (params: {
+  evvmID: string;
   action: number;
   stakingNonce: string;
   priorityFee: string;
   nonceType: number;
   evvmNonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: STAKING_ABI,
-    functionName: 'presaleStake',
-    args: [params.action, BigInt(params.stakingNonce), BigInt(params.priorityFee), params.nonceType, params.evvmNonce as `0x${string}`]
-  });
+  // Use official library for standardized EIP-191 message construction
+  return buildMessageSignedForPresaleStaking(
+    BigInt(params.evvmID),
+    params.action === 1, // true for staking, false for unstaking
+    BigInt(params.stakingNonce),
+    BigInt(params.evvmNonce)
+  );
 };
 
 export const buildPublicStakingSignature = (params: {
+  evvmID: string;
   action: number;
   stakingNonce: string;
   amount: string;
@@ -101,14 +125,17 @@ export const buildPublicStakingSignature = (params: {
   nonceType: number;
   evvmNonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: STAKING_ABI,
-    functionName: 'publicStake',
-    args: [params.action, BigInt(params.stakingNonce), BigInt(params.amount), BigInt(params.priorityFee), params.nonceType, params.evvmNonce as `0x${string}`]
-  });
+  // Use official library for standardized EIP-191 message construction
+  return buildMessageSignedForPublicStaking(
+    BigInt(params.evvmID),
+    params.action === 1, // true for staking, false for unstaking
+    BigInt(params.amount),
+    BigInt(params.stakingNonce)
+  );
 };
 
 export const buildServiceStakingSignature = (params: {
+  evvmID: string;
   serviceAddress: string;
   stakingNonce: string;
   amount: string;
@@ -116,21 +143,18 @@ export const buildServiceStakingSignature = (params: {
   nonceType: number;
   evvmNonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: STAKING_ABI,
-    functionName: 'serviceStake',
-    args: [
-      params.serviceAddress as `0x${string}`,
-      BigInt(params.stakingNonce),
-      BigInt(params.amount),
-      BigInt(params.priorityFee),
-      params.nonceType,
-      params.evvmNonce as `0x${string}`
-    ]
-  });
+  // Use official library for standardized EIP-191 message construction
+  return buildMessageSignedForPublicServiceStake(
+    BigInt(params.evvmID),
+    params.serviceAddress,
+    true, // Assuming staking action (adjust if needed)
+    BigInt(params.amount),
+    BigInt(params.stakingNonce)
+  );
 };
 
 export const buildPreRegisterUsernameSignature = (params: {
+  evvmID: string;
   clowNumber: string;
   username: string;
   priorityFee: string;
@@ -138,21 +162,22 @@ export const buildPreRegisterUsernameSignature = (params: {
   nonceType: number;
   evvmNonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: NAME_SERVICE_ABI,
-    functionName: 'preRegisterUsername',
-    args: [
-      BigInt(params.clowNumber),
-      params.username,
-      BigInt(params.priorityFee),
-      BigInt(params.nameServiceNonce),
-      params.nonceType,
-      params.evvmNonce as `0x${string}`
-    ]
-  });
+  // Hash username with clowNumber for pre-registration
+  const usernameHash = hashPreRegisteredUsername(
+    params.username,
+    BigInt(params.clowNumber)
+  );
+
+  // Use official library for standardized EIP-191 message construction
+  return buildMessageSignedForPreRegistrationUsername(
+    BigInt(params.evvmID),
+    usernameHash.slice(2), // Remove 0x prefix
+    BigInt(params.nameServiceNonce)
+  );
 };
 
 export const buildRegisterUsernameSignature = (params: {
+  evvmID: string;
   nameServiceNonce: string;
   clowNumber: string;
   username: string;
@@ -160,16 +185,11 @@ export const buildRegisterUsernameSignature = (params: {
   nonceType: number;
   evvmNonce: string;
 }) => {
-  return encodeFunctionData({
-    abi: NAME_SERVICE_ABI,
-    functionName: 'registerUsername',
-    args: [
-      BigInt(params.nameServiceNonce),
-      BigInt(params.clowNumber),
-      params.username,
-      BigInt(params.priorityFee),
-      params.nonceType,
-      params.evvmNonce as `0x${string}`
-    ]
-  });
+  // Use official library for standardized EIP-191 message construction
+  return buildMessageSignedForRegistrationUsername(
+    BigInt(params.evvmID),
+    params.username,
+    BigInt(params.clowNumber),
+    BigInt(params.nameServiceNonce)
+  );
 };

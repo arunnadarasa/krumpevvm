@@ -24,6 +24,7 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
   const { data: walletClient } = useWalletClient();
   
   const [singlePayment, setSinglePayment] = useState({
+    evvmID: '1',
     to: '',
     tokenAddress: '',
     amount: '',
@@ -34,6 +35,7 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
   });
 
   const [dispersePayment, setDispersePayment] = useState({
+    evvmID: '1',
     tokenAddress: '',
     priorityFee: '0',
     executor: '',
@@ -75,7 +77,7 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
       if (error) throw error;
 
       toast.success('Payment signature created and signed successfully!');
-      setSinglePayment({ to: '', tokenAddress: '', amount: '', priorityFee: '0', executor: '', nonceType: 0, nonce: '' });
+      setSinglePayment({ evvmID: '1', to: '', tokenAddress: '', amount: '', priorityFee: '0', executor: '', nonceType: 0, nonce: '' });
     } catch (error) {
       console.error('Error creating signature:', error);
       toast.error('Failed to create signature');
@@ -122,7 +124,7 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
       if (error) throw error;
 
       toast.success('Disperse payment signature created and signed successfully!');
-      setDispersePayment({ tokenAddress: '', priorityFee: '0', executor: '', nonceType: 0, nonce: '', recipients: [{ address: '', amount: '' }] });
+      setDispersePayment({ evvmID: '1', tokenAddress: '', priorityFee: '0', executor: '', nonceType: 0, nonce: '', recipients: [{ address: '', amount: '' }] });
     } catch (error) {
       console.error('Error creating signature:', error);
       toast.error('Failed to create signature');
@@ -162,6 +164,16 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
 
           <TabsContent value="single">
             <form onSubmit={handleSinglePaymentSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>EVVM ID</Label>
+                <Input
+                  type="text"
+                  value={singlePayment.evvmID}
+                  onChange={(e) => setSinglePayment({ ...singlePayment, evvmID: e.target.value })}
+                  placeholder="1"
+                />
+              </div>
+
               <AddressInputField
                 label="Recipient Address"
                 value={singlePayment.to}
@@ -218,6 +230,16 @@ export function PaymentSignatureForms({ evvmAddress, chainId }: PaymentSignature
 
           <TabsContent value="disperse">
             <form onSubmit={handleDispersePaymentSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>EVVM ID</Label>
+                <Input
+                  type="text"
+                  value={dispersePayment.evvmID}
+                  onChange={(e) => setDispersePayment({ ...dispersePayment, evvmID: e.target.value })}
+                  placeholder="1"
+                />
+              </div>
+
               <AddressInputField
                 label="Token Address"
                 value={dispersePayment.tokenAddress}

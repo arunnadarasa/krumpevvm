@@ -22,6 +22,7 @@ export function FaucetBalanceForms({ evvmAddress, chainId }: FaucetBalanceFormsP
   const { data: walletClient } = useWalletClient();
   
   const [faucetForm, setFaucetForm] = useState({
+    evvmID: '1',
     to: '',
     tokenAddress: '',
     amount: '',
@@ -73,7 +74,7 @@ export function FaucetBalanceForms({ evvmAddress, chainId }: FaucetBalanceFormsP
       if (error) throw error;
 
       toast.success('Faucet signature created and signed successfully!');
-      setFaucetForm({ to: '', tokenAddress: '', amount: '', nonce: '' });
+      setFaucetForm({ evvmID: '1', to: '', tokenAddress: '', amount: '', nonce: '' });
     } catch (error) {
       console.error('Error creating signature:', error);
       toast.error('Failed to create signature');
@@ -99,6 +100,16 @@ export function FaucetBalanceForms({ evvmAddress, chainId }: FaucetBalanceFormsP
 
           <TabsContent value="faucet">
             <form onSubmit={handleFaucetSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>EVVM ID</Label>
+                <Input
+                  type="text"
+                  value={faucetForm.evvmID}
+                  onChange={(e) => setFaucetForm({ ...faucetForm, evvmID: e.target.value })}
+                  placeholder="1"
+                />
+              </div>
+
               <AddressInputField
                 label="Recipient Address"
                 value={faucetForm.to}
