@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import Home from "./pages/Home";
 import Deploy from "./pages/Deploy";
 import Registry from "./pages/Registry";
+import Toolkit from "./pages/Toolkit";
 import NotFound from "./pages/NotFound";
 
 const App = () => (
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Home />} />
           <Route path="/deploy" element={<Deploy />} />
           <Route path="/registry" element={<Registry />} />
+          <Route path="/toolkit" element={<Toolkit />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

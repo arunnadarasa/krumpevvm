@@ -98,6 +98,54 @@ export type Database = {
         }
         Relationships: []
       }
+      evvm_signatures: {
+        Row: {
+          chain_id: number
+          created_at: string
+          evvm_address: string
+          executed_at: string | null
+          id: string
+          nonce: string | null
+          signature_data: Json
+          signature_hash: string | null
+          signature_type: string
+          status: string
+          tx_hash: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chain_id: number
+          created_at?: string
+          evvm_address: string
+          executed_at?: string | null
+          id?: string
+          nonce?: string | null
+          signature_data: Json
+          signature_hash?: string | null
+          signature_type: string
+          status?: string
+          tx_hash?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chain_id?: number
+          created_at?: string
+          evvm_address?: string
+          executed_at?: string | null
+          id?: string
+          nonce?: string | null
+          signature_data?: Json
+          signature_hash?: string | null
+          signature_type?: string
+          status?: string
+          tx_hash?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null

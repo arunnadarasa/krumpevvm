@@ -25,6 +25,12 @@ export function Header() {
               Deploy
             </Link>
             <Link 
+              to="/toolkit" 
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
+              Toolkit
+            </Link>
+            <Link 
               to="/registry" 
               className="text-sm font-medium hover:text-primary transition-colors"
             >
