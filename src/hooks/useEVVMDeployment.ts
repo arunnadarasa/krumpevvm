@@ -190,9 +190,51 @@ export function useEVVMDeployment() {
         throw new Error(`Wrong network. Expected Ethereum Sepolia (11155111), currently on chain ${currentChain}. Please switch to Sepolia manually.`);
       }
 
+      // Pre-flight validation: Check chain ID is whitelisted
       setProgress({
         stage: 'registering',
-        message: 'Registering EVVM in global registry...'
+        message: `Validating ${contracts.evvmCore} on ${getChainName(formData.hostChainId)}...`
+      });
+
+      const isChainWhitelisted = await sepoliaPublicClient.readContract({
+        address: REGISTRY_ADDRESS,
+        abi: REGISTRY_ABI,
+        functionName: 'isChainIdRegistered',
+        args: [BigInt(formData.hostChainId)]
+      } as any);
+
+      if (!isChainWhitelisted) {
+        throw new Error(
+          `Chain ID ${formData.hostChainId} (${getChainName(formData.hostChainId)}) is not whitelisted for EVVM registration. ` +
+          `Only approved testnet chains can be registered. ` +
+          `Supported chains: Story Aeneid (1315), Story Mainnet (1514).`
+        );
+      }
+
+      // Pre-flight validation: Check EVVM address is not already registered
+      const isAlreadyRegistered = await sepoliaPublicClient.readContract({
+        address: REGISTRY_ADDRESS,
+        abi: REGISTRY_ABI,
+        functionName: 'isAddressRegistered',
+        args: [BigInt(formData.hostChainId), contracts.evvmCore]
+      } as any);
+
+      if (isAlreadyRegistered) {
+        throw new Error(
+          `EVVM Core contract ${contracts.evvmCore} is already registered on ${getChainName(formData.hostChainId)}. ` +
+          `Each EVVM address can only be registered once per chain. ` +
+          `To find your EVVM ID:\n` +
+          `1. Visit ${getExplorerUrl(formData.hostChainId)}\n` +
+          `2. Look up your EVVM Core contract: ${contracts.evvmCore}\n` +
+          `3. Call getEvvmID() to retrieve your assigned ID`
+        );
+      }
+
+      console.log('✅ Pre-flight validation passed - chain whitelisted, address not registered');
+
+      setProgress({
+        stage: 'registering',
+        message: `Registering ${contracts.evvmCore} in global registry...`
       });
 
       const registryHash = await sepoliaWalletClient.writeContract({
@@ -356,8 +398,16 @@ export function useEVVMDeployment() {
       let technicalDetails = '';
       
       if (error instanceof Error) {
+        // Specific error handling for pre-flight validation
+        if (error.message.includes('already registered')) {
+          userMessage = 'EVVM Already Registered';
+          technicalDetails = error.message;
+        } else if (error.message.includes('not whitelisted')) {
+          userMessage = 'Chain Not Supported';
+          technicalDetails = error.message;
+        }
         // Specific error handling for setEvvmID issues
-        if (error.message.includes('OnlyAdmin')) {
+        else if (error.message.includes('OnlyAdmin')) {
           userMessage = 'Not authorized to set EVVM ID';
           technicalDetails = `Only the admin address (${formData.adminAddress}) can set the EVVM ID. Please connect with the correct wallet.`;
         } else if (error.message.includes('WindowToChangeEvvmIDExpired')) {
@@ -418,4 +468,26 @@ function extractEvvmIdFromReceipt(receipt: any): number {
   
   console.log('Extracted EVVM ID:', evvmId);
   return evvmId;
+}
+
+// Helper: Get block explorer URL based on chain ID
+function getExplorerUrl(chainId: number): string {
+  switch (chainId) {
+    case 1315: return 'https://aeneid.explorer.story.foundation';
+    case 1514: return 'https://explorer.story.foundation';
+    case 11155111: return 'https://sepolia.etherscan.io';
+    case 421614: return 'https://sepolia.arbiscan.io';
+    default: return `https://explorer.chain${chainId}.com`;
+  }
+}
+
+// Helper: Get human-readable chain name
+function getChainName(chainId: number): string {
+  switch (chainId) {
+    case 1315: return 'Story Aeneid Testnet';
+    case 1514: return 'Story Mainnet';
+    case 11155111: return 'Ethereum Sepolia';
+    case 421614: return 'Arbitrum Sepolia';
+    default: return `Chain ${chainId}`;
+  }
 }

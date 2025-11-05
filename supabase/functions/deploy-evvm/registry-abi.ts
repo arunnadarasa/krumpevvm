@@ -43,6 +43,16 @@ export const REGISTRY_ABI = [
     stateMutability: 'view',
   },
   {
+    type: 'function',
+    name: 'isAddressRegistered',
+    inputs: [
+      { name: 'chainId', type: 'uint256' },
+      { name: 'evvmAddress', type: 'address' },
+    ],
+    outputs: [{ name: 'registered', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
     type: 'event',
     name: 'EVVMRegistered',
     inputs: [
