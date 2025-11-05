@@ -369,14 +369,21 @@ export function DeploymentWizard() {
           {network === 'Story Testnet' && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Story Network Deployment</AlertTitle>
+              <AlertTitle>⚠️ Story Network Large Contract Deployment</AlertTitle>
               <AlertDescription>
-                EVVM contracts are very large (~110KB). You'll need:
-                <ul className="list-disc ml-4 mt-2 space-y-1">
-                  <li>At least <strong>0.3 IP</strong> for gas fees</li>
-                  <li>To <strong>manually increase gas limit</strong> in MetaMask (suggested: 50M per contract)</li>
-                  <li>~5-10 minutes for all 5 contracts to deploy</li>
-                </ul>
+                <div className="space-y-2 text-sm">
+                  <p className="font-semibold">EVVM contracts are extremely large (~90-110KB each). Critical requirements:</p>
+                  <ul className="list-disc ml-4 space-y-1">
+                    <li>You need <strong>at least 0.5 IP</strong> in your wallet for all 5 contracts</li>
+                    <li><strong className="text-destructive">MUST manually increase gas limit</strong> in MetaMask to <strong>55,000,000</strong> (55M) for each contract</li>
+                    <li>Each transaction will cost ~0.08-0.12 IP</li>
+                    <li>Total deployment time: ~8-15 minutes</li>
+                    <li>MetaMask may show "out of gas" errors if you don't increase the limit</li>
+                  </ul>
+                  <p className="mt-2 font-semibold text-primary">
+                    💡 Tip: In MetaMask, click "Edit" → "Advanced gas fees" → Set "Gas limit" to 55000000
+                  </p>
+                </div>
               </AlertDescription>
             </Alert>
           )}

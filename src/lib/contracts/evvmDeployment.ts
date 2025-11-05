@@ -1,4 +1,4 @@
-import { Address, Hash, PublicClient, WalletClient, isAddress, formatEther, parseEther, encodeFunctionData } from 'viem';
+import { Address, Hash, PublicClient, WalletClient, isAddress, formatEther, parseEther, encodeFunctionData, encodeAbiParameters } from 'viem';
 import {
   EVVM_CORE_ABI,
   EVVM_CORE_BYTECODE,
@@ -142,35 +142,63 @@ async function estimateDeploymentGas(
   isStoryNetwork: boolean = false
 ): Promise<bigint> {
   try {
-    const deployData = encodeFunctionData({
-      abi: params.abi,
-      args: params.args
-    });
+    // For contract deployment, encode constructor args properly
+    const constructorArgs = encodeAbiParameters(
+      params.abi.find((x: any) => x.type === 'constructor')?.inputs || [],
+      params.args
+    );
     
-    // Estimate gas with full deployment bytecode
+    // Full deployment bytecode = bytecode + constructor args
+    const fullDeploymentBytecode = `${params.bytecode}${constructorArgs.slice(2)}` as `0x${string}`;
+    
+    // Try to estimate gas
     const estimate = await publicClient.estimateGas({
-      data: `${params.bytecode}${deployData.slice(2)}` as `0x${string}`
+      data: fullDeploymentBytecode
     });
     
-    // Story needs higher buffer for large contracts
-    const bufferMultiplier = isStoryNetwork ? 150n : 130n; // 50% vs 30%
-    return (estimate * bufferMultiplier) / 100n;
-  } catch (error) {
-    console.warn('Gas estimation failed, using bytecode-based fallback:', error);
+    // Apply buffer (50% for Story, 30% for others)
+    const bufferMultiplier = isStoryNetwork ? 150n : 130n;
+    const estimatedWithBuffer = (estimate * bufferMultiplier) / 100n;
     
-    // Calculate fallback based on bytecode size
-    const bytecodeLength = params.bytecode.length / 2; // Convert hex chars to bytes
+    console.log('✅ Gas estimation succeeded:', {
+      rawEstimate: estimate.toString(),
+      withBuffer: estimatedWithBuffer.toString(),
+      bufferPercent: isStoryNetwork ? '50%' : '30%'
+    });
+    
+    return estimatedWithBuffer;
+    
+  } catch (error) {
+    console.warn('⚠️ Gas estimation failed, using bytecode-based fallback:', error);
+    
+    // Fallback: Calculate based on full deployment bytecode size
+    const constructorArgs = encodeAbiParameters(
+      params.abi.find((x: any) => x.type === 'constructor')?.inputs || [],
+      params.args
+    );
+    
+    const fullDeploymentBytecode = `${params.bytecode}${constructorArgs.slice(2)}`;
+    const fullBytecodeLength = fullDeploymentBytecode.length / 2; // hex chars to bytes
     
     if (isStoryNetwork) {
-      // Story: 300 gas per byte + 10M for execution overhead
-      const gasPerByte = 300n;
-      const executionOverhead = 10_000_000n;
-      return (BigInt(bytecodeLength) * gasPerByte) + executionOverhead;
+      // Story: 400 gas per byte + 15M execution overhead (conservative!)
+      const gasPerByte = 400n;
+      const executionOverhead = 15_000_000n;
+      const fallbackGas = (BigInt(fullBytecodeLength) * gasPerByte) + executionOverhead;
+      
+      console.log('📊 Story fallback calculation:', {
+        fullBytecodeBytes: fullBytecodeLength,
+        formula: `${fullBytecodeLength} × 400 + 15M`,
+        result: fallbackGas.toString(),
+        resultInMillion: `${(Number(fallbackGas) / 1_000_000).toFixed(1)}M`
+      });
+      
+      return fallbackGas;
     } else {
-      // Standard EVM: 200 gas per byte + 5M for execution overhead
+      // Standard EVM: 200 gas per byte + 5M execution overhead
       const gasPerByte = 200n;
       const executionOverhead = 5_000_000n;
-      return (BigInt(bytecodeLength) * gasPerByte) + executionOverhead;
+      return (BigInt(fullBytecodeLength) * gasPerByte) + executionOverhead;
     }
   }
 }
@@ -684,11 +712,22 @@ async function deployContract(
   // Estimate gas needed with buffer (50% for Story, 30% for others)
   const gasLimit = await estimateDeploymentGas(publicClient, params, isStoryNetwork);
   
-  console.log('Gas configuration:', {
+  // Log final gas configuration before deployment
+  console.log('🚀 Final deployment configuration:', {
     gasLimit: gasLimit.toString(),
+    gasLimitInMillion: `${(Number(gasLimit) / 1_000_000).toFixed(1)}M`,
     gasPrice: bufferedGasPrice.toString(),
-    estimatedCost: formatEther((gasLimit * bufferedGasPrice))
+    estimatedCost: formatEther((gasLimit * bufferedGasPrice)),
+    network: isStoryNetwork ? 'Story (large contracts!)' : 'Standard EVM'
   });
+  
+  // Story-specific warning if gas seems low
+  if (isStoryNetwork && gasLimit < 40_000_000n) {
+    console.warn('⚠️ WARNING: Gas limit seems low for Story deployment!', {
+      current: gasLimit.toString(),
+      recommended: '50M-60M for large contracts'
+    });
+  }
   
   const hash = await walletClient.deployContract({
     abi: params.abi,
