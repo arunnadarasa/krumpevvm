@@ -9,12 +9,13 @@ import { toast } from 'sonner';
 import { Loader2, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useEVVMDeployment } from '@/hooks/useEVVMDeployment';
 
-type Step = 'setup' | 'configure' | 'deploy';
+type Step = 'setup' | 'configure' | 'deploy' | 'registry' | 'complete';
 
 export function DeploymentWizard() {
-  const { address } = useAccount();
-  const { deploying, progress, deploymentResult, deployEVVM } = useEVVMDeployment();
+  const { address, chain } = useAccount();
+  const { deploying, registering, progress, deployedContracts, deploymentResult, deployContracts, registerInRegistry } = useEVVMDeployment();
   const [step, setStep] = useState<Step>('setup');
+  const [switching, setSwitching] = useState(false);
 
   // Form state
   const [evvmName, setEvvmName] = useState('');
@@ -74,13 +75,15 @@ export function DeploymentWizard() {
     return true;
   };
 
+  const isOnSepolia = chain?.id === 11155111;
+
   const handleDeploy = async () => {
     if (!network) {
       toast.error('Please select a network');
       return;
     }
 
-    await deployEVVM({
+    const result = await deployContracts({
       evvmName,
       principalTokenName: tokenName,
       principalTokenSymbol: tokenSymbol,
@@ -93,6 +96,43 @@ export function DeploymentWizard() {
       eraTokens: eraTokens || '0',
       rewardPerOperation: rewardPerOperation || '0',
     });
+
+    if (result) {
+      setStep('registry');
+    }
+  };
+
+  const handleRegisterInRegistry = async () => {
+    if (!deployedContracts) {
+      toast.error('No deployed contracts found');
+      return;
+    }
+
+    if (chain?.id !== 11155111) {
+      toast.error('Please switch to Ethereum Sepolia first');
+      return;
+    }
+
+    await registerInRegistry(
+      {
+        evvmName,
+        principalTokenName: tokenName,
+        principalTokenSymbol: tokenSymbol,
+        hostChainId: getChainId(network),
+        hostChainName: network,
+        adminAddress: adminAddress as `0x${string}`,
+        goldenFisherAddress: goldenFisherAddress as `0x${string}`,
+        activatorAddress: activatorAddress as `0x${string}`,
+        totalSupply: totalSupply || '0',
+        eraTokens: eraTokens || '0',
+        rewardPerOperation: rewardPerOperation || '0',
+      },
+      deployedContracts
+    );
+
+    if (deploymentResult) {
+      setStep('complete');
+    }
   };
 
   const resetForm = () => {
@@ -110,24 +150,35 @@ export function DeploymentWizard() {
     setNetwork('');
   };
 
+  const getStepOrder = (s: Step): number => {
+    const order = { setup: 0, configure: 1, deploy: 2, registry: 3, complete: 4 };
+    return order[s];
+  };
+
   return (
     <Card className="glass-card p-8 max-w-4xl mx-auto">
       {/* Progress Steps */}
       <div className="flex justify-between mb-8">
-        {(['setup', 'configure', 'deploy'] as Step[]).map((s, index) => (
+        {(['setup', 'configure', 'deploy', 'registry', 'complete'] as Step[]).map((s, index) => (
           <div key={s} className="flex items-center flex-1">
-            <div className={`flex items-center gap-2 ${step === s ? 'text-primary' : step > s ? 'text-accent' : 'text-muted-foreground'}`}>
+            <div className={`flex items-center gap-2 ${
+              step === s ? 'text-primary' : 
+              getStepOrder(step) > getStepOrder(s) ? 'text-accent' : 
+              'text-muted-foreground'
+            }`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
                 step === s ? 'border-primary bg-primary/20' : 
-                step > s ? 'border-accent bg-accent/20' : 
+                getStepOrder(step) > getStepOrder(s) ? 'border-accent bg-accent/20' : 
                 'border-border'
               }`}>
-                {step > s ? <CheckCircle2 className="w-5 h-5" /> : index + 1}
+                {getStepOrder(step) > getStepOrder(s) ? <CheckCircle2 className="w-5 h-5" /> : index + 1}
               </div>
-              <span className="font-medium capitalize hidden sm:inline">{s}</span>
+              <span className="font-medium capitalize hidden sm:inline text-xs sm:text-sm">{s}</span>
             </div>
-            {index < 2 && (
-              <div className={`flex-1 h-0.5 mx-4 ${step > s ? 'bg-accent' : 'bg-border'}`} />
+            {index < 4 && (
+              <div className={`flex-1 h-0.5 mx-2 sm:mx-4 ${
+                getStepOrder(step) > getStepOrder(s) ? 'bg-accent' : 'bg-border'
+              }`} />
             )}
           </div>
         ))}
@@ -379,6 +430,147 @@ export function DeploymentWizard() {
               ) : (
                 'Deploy EVVM'
               )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Registry */}
+      {step === 'registry' && deployedContracts && (
+        <div className="space-y-6">
+          <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-6">
+            <h3 className="font-semibold text-lg mb-2 text-foreground">
+              📋 Registry Registration Required
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              Your EVVM contracts have been deployed successfully on <strong>{network}</strong>.
+              To complete the deployment, we need to register your EVVM in the 
+              global registry on <strong>Ethereum Sepolia</strong>.
+            </p>
+            
+            <Card className="p-4 bg-background mb-4">
+              <div className="text-sm space-y-1">
+                <div>
+                  <span className="text-muted-foreground">EVVM Core:</span>{' '}
+                  <span className="font-mono text-xs">{deployedContracts.evvmCore}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Deployed on:</span>{' '}
+                  <span className="font-semibold">{network}</span>
+                </div>
+              </div>
+            </Card>
+            
+            {!isOnSepolia && (
+              <>
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-foreground">
+                    ⚠️ You need to switch your wallet to <strong>Ethereum Sepolia</strong> 
+                    to register in the global registry.
+                  </p>
+                </div>
+                
+                <Button
+                  onClick={() => toast.info('Please switch to Ethereum Sepolia in your wallet')}
+                  className="w-full gradient-primary"
+                  disabled={switching}
+                >
+                  {switching ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Waiting for network switch...
+                    </>
+                  ) : (
+                    'Switch to Ethereum Sepolia in MetaMask'
+                  )}
+                </Button>
+              </>
+            )}
+            
+            {isOnSepolia && (
+              <>
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-foreground flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    Connected to Ethereum Sepolia - Ready to register!
+                  </p>
+                </div>
+                
+                <Button
+                  onClick={handleRegisterInRegistry}
+                  className="w-full gradient-primary shadow-glow"
+                  disabled={registering}
+                >
+                  {registering ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Registering in Registry...
+                    </>
+                  ) : (
+                    'Register in Global Registry'
+                  )}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {progress && progress.stage === 'registering' && progress.txHash && (
+            <div className="space-y-3 bg-primary/5 border border-primary/20 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="font-medium text-foreground">{progress.message}</span>
+              </div>
+              
+              <div className="text-sm space-y-1">
+                <div className="text-muted-foreground">Transaction Hash:</div>
+                <a
+                  href={`https://sepolia.etherscan.io/tx/${progress.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-primary hover:underline break-all text-xs"
+                >
+                  {progress.txHash}
+                </a>
+                <div className="text-muted-foreground text-xs mt-2 flex items-center gap-1">
+                  ⏳ Waiting for confirmation on Ethereum Sepolia...
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 5: Complete */}
+      {step === 'complete' && deploymentResult && (
+        <div className="space-y-6">
+          <div className="space-y-3 bg-accent/5 border border-accent/20 rounded-lg p-6">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-6 w-6 text-accent" />
+              <span className="font-semibold text-lg text-foreground">Deployment Complete!</span>
+            </div>
+            <p className="text-muted-foreground">
+              Your EVVM has been successfully deployed and registered in the global registry.
+            </p>
+            <div className="text-sm space-y-2 mt-4">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">EVVM ID:</span>
+                <span className="font-mono font-semibold">{deploymentResult.evvmId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">EVVM Core:</span>
+                <span className="font-mono text-xs">{deploymentResult.addresses.evvmCore.slice(0, 10)}...{deploymentResult.addresses.evvmCore.slice(-8)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Host Chain:</span>
+                <span className="font-semibold">{network}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Registry Chain:</span>
+                <span className="font-semibold">Ethereum Sepolia</span>
+              </div>
+            </div>
+            <Button onClick={resetForm} className="w-full mt-4 gradient-primary">
+              Deploy Another EVVM
             </Button>
           </div>
         </div>

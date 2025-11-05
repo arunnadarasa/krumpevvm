@@ -51,8 +51,10 @@ export type DeploymentStage =
   | 'deploying-treasury'     // 5/7
   | 'setup-evvm'             // 6/7
   | 'setup-staking'          // 7/7
-  | 'registering'
-  | 'complete';
+  | 'deployment-complete'    // Contracts deployed
+  | 'switching-network'      // Switching to Sepolia
+  | 'registering'            // Registry registration
+  | 'complete';              // Everything done
 
 export interface DeploymentProgress {
   stage: DeploymentStage;

@@ -168,6 +168,41 @@ This approach:
 - ✅ Better error handling
 - ❌ Requires Foundry in edge function environment
 
+## Why Two Networks?
+
+Your EVVM deployment involves **TWO blockchains**:
+
+1. **Host Chain** (Story Testnet, Arbitrum Sepolia, or Ethereum Sepolia)
+   - Where your EVVM contracts are deployed
+   - Where your EVVM executes operations
+   - Where gas fees are paid in the native token
+
+2. **Registry Chain** (Always Ethereum Sepolia)
+   - Global registry of all EVVMs
+   - Assigns unique EVVM IDs
+   - Enables cross-chain discovery
+
+### Deployment Flow
+
+```
+Step 1-3: Deploy contracts → Your chosen network (e.g., Story Testnet)
+          ↓
+Step 4:   Switch wallet → Ethereum Sepolia
+          ↓
+Step 5:   Register → Sepolia Registry Contract
+          ↓
+Result:   EVVM ID assigned (1000+)
+```
+
+### Estimated Costs
+
+- **Deployment** (Story Testnet): ~0.12 IP tokens
+- **Deployment** (Arbitrum Sepolia): ~0.08 ETH
+- **Registration** (Ethereum Sepolia): ~0.003 ETH
+- **Total networks**: 2 different testnets
+
+---
+
 ## Troubleshooting Deployment Issues
 
 ### Common Errors and Solutions

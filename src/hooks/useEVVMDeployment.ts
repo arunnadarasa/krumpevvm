@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { sepolia } from 'wagmi/chains';
 
-interface DeploymentFormData {
+export interface DeploymentFormData {
   evvmName: string;
   principalTokenName: string;
   principalTokenSymbol: string;
@@ -21,9 +21,20 @@ interface DeploymentFormData {
   rewardPerOperation: string;
 }
 
+interface ContractAddresses {
+  evvmCore: Address;
+  nameService: Address;
+  staking: Address;
+  estimator: Address;
+  treasury: Address;
+  deploymentTxHash: Hash;
+}
+
 export function useEVVMDeployment() {
   const [deploying, setDeploying] = useState(false);
+  const [registering, setRegistering] = useState(false);
   const [progress, setProgress] = useState<DeploymentProgress | null>(null);
+  const [deployedContracts, setDeployedContracts] = useState<ContractAddresses | null>(null);
   const [deploymentResult, setDeploymentResult] = useState<{
     evvmId: number;
     addresses: {
@@ -45,22 +56,24 @@ export function useEVVMDeployment() {
   const { switchChainAsync } = useSwitchChain();
   const { toast } = useToast();
 
-  const deployEVVM = async (formData: DeploymentFormData) => {
+  // Phase A: Deploy EVVM contracts on host chain
+  const deployContracts = async (formData: DeploymentFormData) => {
     if (!walletClient || !publicClient || !userAddress) {
       toast({
         title: 'Wallet not connected',
         description: 'Please connect your wallet to deploy',
         variant: 'destructive'
       });
-      return;
+      return null;
     }
 
     setDeploying(true);
     setProgress(null);
+    setDeployedContracts(null);
     setDeploymentResult(null);
 
     try {
-      // Step 1: Deploy EVVM contracts on host chain
+      // Deploy EVVM contracts on host chain
       const contracts = await deployEVVMContracts(
         {
           adminAddress: formData.adminAddress,
@@ -79,40 +92,140 @@ export function useEVVMDeployment() {
         (p) => setProgress(p)
       );
 
-      // Step 2: Switch to Ethereum Sepolia for registry
       setProgress({
-        stage: 'complete',
-        message: 'Switching to Ethereum Sepolia for registration...'
+        stage: 'deployment-complete',
+        message: 'Contracts deployed successfully! Ready for registry registration.'
+      });
+
+      const contractAddresses: ContractAddresses = {
+        evvmCore: contracts.evvmCoreAddress,
+        nameService: contracts.nameServiceAddress,
+        staking: contracts.stakingAddress,
+        estimator: contracts.estimatorAddress,
+        treasury: contracts.treasuryAddress,
+        deploymentTxHash: contracts.deploymentTxHash
+      };
+
+      setDeployedContracts(contractAddresses);
+
+      toast({
+        title: 'Contracts Deployed!',
+        description: 'Now switch to Ethereum Sepolia to register in the global registry'
+      });
+
+      return contractAddresses;
+
+    } catch (error) {
+      console.error('Deployment error:', error);
+      
+      let userMessage = 'Deployment failed';
+      let technicalDetails = '';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('User rejected') || error.message.includes('user rejected')) {
+          userMessage = 'Transaction was rejected in MetaMask';
+          technicalDetails = 'Please approve all transactions to complete deployment';
+        } else if (error.message.includes('gas') || error.message.includes('Gas')) {
+          userMessage = 'Transaction ran out of gas';
+          technicalDetails = 'Try increasing gas limit in MetaMask or check if you have enough ETH';
+        } else if (error.message.includes('network') || error.message.includes('Network')) {
+          userMessage = 'Network connection issue';
+          technicalDetails = 'Please check your internet connection and try again';
+        } else if (error.message.includes('dropped') || error.message.includes('replaced')) {
+          userMessage = 'Transaction was dropped or replaced';
+          technicalDetails = 'This usually means gas price was too low. Try again with higher gas.';
+        } else {
+          technicalDetails = error.message;
+        }
+      }
+      
+      toast({
+        title: userMessage,
+        description: technicalDetails,
+        variant: 'destructive',
+        duration: 10000
+      });
+
+      return null;
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  // Phase B: Register in Sepolia Registry (always on Sepolia)
+  const registerInRegistry = async (formData: DeploymentFormData, contracts: ContractAddresses) => {
+    if (!userAddress) {
+      toast({
+        title: 'Wallet not connected',
+        description: 'Please connect your wallet',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setRegistering(true);
+
+    try {
+      // Get fresh wallet and public clients for Sepolia
+      setProgress({
+        stage: 'switching-network',
+        message: 'Preparing to switch to Ethereum Sepolia...'
       });
 
       await switchChainAsync({ chainId: 11155111 }); // Sepolia
 
-      // Step 3: Register in Registry
+      // Wait for new clients to be ready
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Get fresh clients bound to Sepolia
+      const { data: sepoliaWalletClient } = useWalletClient({ chainId: 11155111 });
+      const sepoliaPublicClient = usePublicClient({ chainId: 11155111 });
+
+      if (!sepoliaWalletClient || !sepoliaPublicClient) {
+        throw new Error('Failed to get Sepolia clients. Please ensure you are connected to Ethereum Sepolia.');
+      }
+
+      // Verify we're on Sepolia
+      const currentChain = await sepoliaPublicClient.getChainId();
+      if (currentChain !== 11155111) {
+        throw new Error(`Wrong network. Expected Ethereum Sepolia (11155111), currently on chain ${currentChain}. Please switch to Sepolia manually.`);
+      }
+
       setProgress({
-        stage: 'complete',
-        message: 'Registering EVVM in Registry...'
+        stage: 'registering',
+        message: 'Registering EVVM in global registry...'
       });
 
-      const registryHash = await walletClient.writeContract({
+      const registryHash = await sepoliaWalletClient.writeContract({
         address: REGISTRY_ADDRESS,
         abi: REGISTRY_ABI,
         functionName: 'registerEvvm',
-        args: [BigInt(formData.hostChainId), contracts.evvmCoreAddress]
-      } as any);
+        args: [BigInt(formData.hostChainId), contracts.evvmCore],
+        chain: sepolia,
+        account: sepoliaWalletClient.account!
+      });
 
-      const registryReceipt = await publicClient.waitForTransactionReceipt({
-        hash: registryHash
+      setProgress({
+        stage: 'registering',
+        message: 'Waiting for registry confirmation...',
+        txHash: registryHash
+      });
+
+      const registryReceipt = await sepoliaPublicClient.waitForTransactionReceipt({
+        hash: registryHash,
+        confirmations: 3,
+        timeout: 300_000
       });
 
       // Extract EVVM ID from events
       const evvmId = extractEvvmIdFromReceipt(registryReceipt);
 
-      // Step 4: Save to database
       setProgress({
         stage: 'complete',
         message: 'Saving deployment data...'
       });
 
+      // Save to database
       const { error: dbError } = await supabase
         .from('evvm_deployments')
         .insert([{
@@ -128,11 +241,11 @@ export function useEVVMDeployment() {
           total_supply: Number(formData.totalSupply),
           era_tokens: Number(formData.eraTokens),
           reward_per_operation: Number(formData.rewardPerOperation),
-          evvm_core_address: contracts.evvmCoreAddress,
-          name_service_address: contracts.nameServiceAddress,
-          staking_address: contracts.stakingAddress,
-          estimator_address: contracts.estimatorAddress,
-          treasury_address: contracts.treasuryAddress,
+          evvm_core_address: contracts.evvmCore,
+          name_service_address: contracts.nameService,
+          staking_address: contracts.staking,
+          estimator_address: contracts.estimator,
+          treasury_address: contracts.treasury,
           deployment_tx_hash: contracts.deploymentTxHash,
           registry_tx_hash: registryHash,
           evvm_id: evvmId,
@@ -144,11 +257,11 @@ export function useEVVMDeployment() {
       setDeploymentResult({
         evvmId,
         addresses: {
-          evvmCore: contracts.evvmCoreAddress,
-          nameService: contracts.nameServiceAddress,
-          staking: contracts.stakingAddress,
-          estimator: contracts.estimatorAddress,
-          treasury: contracts.treasuryAddress
+          evvmCore: contracts.evvmCore,
+          nameService: contracts.nameService,
+          staking: contracts.staking,
+          estimator: contracts.estimator,
+          treasury: contracts.treasury
         },
         txHashes: {
           deployment: contracts.deploymentTxHash,
@@ -157,27 +270,47 @@ export function useEVVMDeployment() {
       });
 
       toast({
-        title: 'EVVM Deployed Successfully!',
+        title: 'EVVM Registered Successfully!',
         description: `Your EVVM has been assigned ID: ${evvmId}`
       });
 
     } catch (error) {
-      console.error('Deployment error:', error);
+      console.error('Registration error:', error);
+      
+      let userMessage = 'Registry registration failed';
+      let technicalDetails = '';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('chain') || error.message.includes('Chain')) {
+          userMessage = 'Network Mismatch';
+          technicalDetails = 'Please make sure you are connected to Ethereum Sepolia (Chain ID: 11155111) before registering.';
+        } else if (error.message.includes('User rejected') || error.message.includes('user rejected')) {
+          userMessage = 'Transaction rejected in MetaMask';
+          technicalDetails = 'Please approve the transaction to complete registration';
+        } else {
+          technicalDetails = error.message;
+        }
+      }
+      
       toast({
-        title: 'Deployment Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: 'destructive'
+        title: userMessage,
+        description: technicalDetails,
+        variant: 'destructive',
+        duration: 10000
       });
     } finally {
-      setDeploying(false);
+      setRegistering(false);
     }
   };
 
   return {
     deploying,
+    registering,
     progress,
+    deployedContracts,
     deploymentResult,
-    deployEVVM
+    deployContracts,
+    registerInRegistry
   };
 }
 
